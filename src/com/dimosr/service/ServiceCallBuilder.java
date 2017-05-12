@@ -4,11 +4,11 @@ import com.dimosr.service.core.Cache;
 import com.dimosr.service.core.ServiceCall;
 
 public class ServiceCallBuilder<REQUEST, RESPONSE> {
-    private ServiceCall<REQUEST, RESPONSE> enhancedService;
+    private ServiceCall<REQUEST, RESPONSE> enhancedServiceCall;
     private Cache<REQUEST, RESPONSE> cache;
 
-    public ServiceCallBuilder(ServiceCall<REQUEST, RESPONSE> service) {
-        this.enhancedService = service;
+    public ServiceCallBuilder(final ServiceCall<REQUEST, RESPONSE> serviceCall) {
+        this.enhancedServiceCall = serviceCall;
     }
 
     public ServiceCallBuilder<REQUEST, RESPONSE> withCache(Cache<REQUEST, RESPONSE> cache) {
@@ -18,9 +18,9 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     public ServiceCall<REQUEST, RESPONSE> build() {
         if(cache != null) {
-            enhancedService = new CachedService<>(enhancedService, cache);
+            enhancedServiceCall = new CachedServiceCall<>(enhancedServiceCall, cache);
         }
 
-        return enhancedService;
+        return enhancedServiceCall;
     }
 }

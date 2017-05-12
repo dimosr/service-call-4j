@@ -20,24 +20,24 @@ import static org.mockito.Mockito.when;
 public class ServiceCallBuilderTest {
 
     @Mock
-    private ServiceCall<String, String> originalService;
+    private ServiceCall<String, String> originalServiceCall;
 
     private final static String SAMPLE_REQUEST = "input";
     private final static String SAMPLE_RESPONSE = "input with some more data";
 
     @Before
     public void setupOriginalServiceResponses() {
-        when(originalService.call(SAMPLE_REQUEST))
+        when(originalServiceCall.call(SAMPLE_REQUEST))
                 .thenReturn(SAMPLE_RESPONSE);
     }
 
     @Test
     public void testBuildingPlainServiceCall() {
-        ServiceCall<String, String> enhancedService = new ServiceCallBuilder<>(originalService)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
                                                                                         .build();
 
-        String response = enhancedService.call(SAMPLE_REQUEST);
-        verify(originalService).call(SAMPLE_REQUEST);
+        String response = enhancedServiceCall.call(SAMPLE_REQUEST);
+        verify(originalServiceCall).call(SAMPLE_REQUEST);
     }
 
     @Test
@@ -47,14 +47,14 @@ public class ServiceCallBuilderTest {
                 .thenReturn(Optional.empty());
 
 
-        ServiceCall<String, String> enhancedService = new ServiceCallBuilder<>(originalService)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
                 .withCache(cache)
                 .build();
 
-        String response = enhancedService.call(SAMPLE_REQUEST);
+        String response = enhancedServiceCall.call(SAMPLE_REQUEST);
 
-        InOrder orderSensitiveMocks = inOrder(originalService, cache);
+        InOrder orderSensitiveMocks = inOrder(originalServiceCall, cache);
         orderSensitiveMocks.verify(cache).get(SAMPLE_REQUEST);
-        orderSensitiveMocks.verify(originalService).call(SAMPLE_REQUEST);
+        orderSensitiveMocks.verify(originalServiceCall).call(SAMPLE_REQUEST);
     }
 }

@@ -18,12 +18,12 @@ import static org.mockito.Mockito.when;
 
 
 @RunWith(MockitoJUnitRunner.class)
-public class CachedServiceTest {
+public class CachedServiceCallTest {
 
-    private CachedService<String, String> cachedService;
+    private CachedServiceCall<String, String> cachedServiceCall;
 
     @Mock
-    private ServiceCall<String, String> mockRootService;
+    private ServiceCall<String, String> mockRootServiceCall;
     @Mock
     private Cache<String, String> mockCache;
 
@@ -32,20 +32,20 @@ public class CachedServiceTest {
 
     @Before
     public void setupCachedService() {
-        this.cachedService = new CachedService<>(mockRootService, mockCache);
+        this.cachedServiceCall = new CachedServiceCall<>(mockRootServiceCall, mockCache);
     }
 
     @Test
     public void whenAskingUncachedRequestResponseIsReturnedFromServiceAndAlsoCached() {
         when(mockCache.get(SAMPLE_REQUEST))
                 .thenReturn(Optional.empty());
-        when(mockRootService.call(SAMPLE_REQUEST))
+        when(mockRootServiceCall.call(SAMPLE_REQUEST))
                 .thenReturn(SAMPLE_RESPONSE);
 
-        String response = cachedService.call(SAMPLE_REQUEST);
+        String response = cachedServiceCall.call(SAMPLE_REQUEST);
 
         verify(mockCache).get(SAMPLE_REQUEST);
-        verify(mockRootService).call(SAMPLE_REQUEST);
+        verify(mockRootServiceCall).call(SAMPLE_REQUEST);
         verify(mockCache).put(SAMPLE_REQUEST, SAMPLE_RESPONSE);
 
         assertThat(response).isEqualTo(SAMPLE_RESPONSE);
@@ -56,10 +56,10 @@ public class CachedServiceTest {
         when(mockCache.get(SAMPLE_REQUEST))
                 .thenReturn(Optional.of(SAMPLE_RESPONSE));
 
-        String response = cachedService.call(SAMPLE_REQUEST);
+        String response = cachedServiceCall.call(SAMPLE_REQUEST);
 
         verify(mockCache).get(SAMPLE_REQUEST);
-        verify(mockRootService, never()).call(anyString());
+        verify(mockRootServiceCall, never()).call(anyString());
 
         assertThat(response).isEqualTo(SAMPLE_RESPONSE);
     }

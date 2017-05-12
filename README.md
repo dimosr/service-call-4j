@@ -1,6 +1,6 @@
 ## Service-Call-4j
 
-A library for enhancing your service calls with several additional features
+A library for enhancing your serviceCall calls with several additional features
 
 ### Build Process
 

@@ -25,49 +25,45 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
-public class MonitoredServiceTest {
+public class MonitoredServiceCallTest {
 
     @Mock
     private Clock mockClock;
     @Mock
-    private ServiceCall<String, String> mockRootService;
+    private ServiceCall<String, String> mockRootServiceCall;
     @Mock
     private Consumer<Duration> latencyConsumer;
     @Mock
     private ExecutorService mockExecutor;
 
-    private ServiceCall<String, String> monitoredService;
+    private ServiceCall<String, String> monitoredServiceCall;
     private ServiceCall<String, String> monitoredServiceWithExecutor;
+
+    private static final Instant BEFORE_CALL = Instant.ofEpochMilli(1000);
+    private static final long CALL_LATENCY_IN_MILLISECONDS = 500;
+    private static final Instant AFTER_CALL = BEFORE_CALL.plusMillis(CALL_LATENCY_IN_MILLISECONDS);
 
     @Before
     public void setupMonitoredService() {
-        monitoredService = new MonitoredService<>(mockRootService, mockClock, latencyConsumer);
-        monitoredServiceWithExecutor = new MonitoredService<>(mockRootService, mockClock, latencyConsumer, mockExecutor);
+        monitoredServiceCall = new MonitoredServiceCall<>(mockRootServiceCall, mockClock, latencyConsumer);
+        monitoredServiceWithExecutor = new MonitoredServiceCall<>(mockRootServiceCall, mockClock, latencyConsumer, mockExecutor);
+
+        when(mockClock.instant())
+                .thenReturn(BEFORE_CALL)
+                .thenReturn(AFTER_CALL);
     }
 
     @Test
     public void whenMakingARequestLatencyIsCalculatedCorrectlyAndTriggersCallbackSync() {
-        Instant beforeCall = Instant.ofEpochMilli(1000);
-        long latencyInMilliseconds = 500;
-        when(mockClock.instant())
-                .thenReturn(beforeCall)
-                .thenReturn(beforeCall.plusMillis(latencyInMilliseconds));
-
-        monitoredService.call("irrelevant-request");
+        monitoredServiceCall.call("irrelevant-request");
 
         verify(latencyConsumer)
-                .accept(argThat(new SameDurationInMillis(Duration.ofMillis(latencyInMilliseconds))));
+                .accept(argThat(new SameDurationInMillis(Duration.ofMillis(CALL_LATENCY_IN_MILLISECONDS))));
     }
 
     @Test
     public void whenMakingARequestLatencyIsCalculatedCorrectlyAndTriggersCallbackASync() {
         ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
-
-        Instant beforeCall = Instant.ofEpochMilli(1000);
-        long latencyInMilliseconds = 500;
-        when(mockClock.instant())
-                .thenReturn(beforeCall)
-                .thenReturn(beforeCall.plusMillis(latencyInMilliseconds));
 
         InOrder inOrder = inOrder(mockExecutor, latencyConsumer);
 
@@ -79,7 +75,7 @@ public class MonitoredServiceTest {
 
         runnableCaptor.getValue().run();
         inOrder.verify(latencyConsumer)
-                .accept(argThat(new SameDurationInMillis(Duration.ofMillis(latencyInMilliseconds))));
+                .accept(argThat(new SameDurationInMillis(Duration.ofMillis(CALL_LATENCY_IN_MILLISECONDS))));
     }
 
     @Test
@@ -87,12 +83,10 @@ public class MonitoredServiceTest {
         final String request = "request";
         final String expectedResponse = "response";
 
-        when(mockClock.instant())
-                .thenReturn(Instant.EPOCH);
-        when(mockRootService.call(request))
+        when(mockRootServiceCall.call(request))
                 .thenReturn(expectedResponse);
 
-        String actualResponse = monitoredService.call(request);
+        String actualResponse = monitoredServiceCall.call(request);
 
         assertThat(actualResponse).isEqualTo(expectedResponse);
     }
