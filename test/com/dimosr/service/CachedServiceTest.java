@@ -1,7 +1,7 @@
-package com.dimosr.service.proxy;
+package com.dimosr.service;
 
-import com.dimosr.service.Cache;
-import com.dimosr.service.ServiceCall;
+import com.dimosr.service.core.Cache;
+import com.dimosr.service.core.ServiceCall;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

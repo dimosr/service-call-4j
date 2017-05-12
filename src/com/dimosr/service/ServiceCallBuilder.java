@@ -1,8 +1,7 @@
-package com.dimosr.service.build;
+package com.dimosr.service;
 
-import com.dimosr.service.Cache;
-import com.dimosr.service.ServiceCall;
-import com.dimosr.service.proxy.CachedService;
+import com.dimosr.service.core.Cache;
+import com.dimosr.service.core.ServiceCall;
 
 public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private ServiceCall<REQUEST, RESPONSE> enhancedService;
