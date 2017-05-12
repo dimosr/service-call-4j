@@ -70,7 +70,7 @@ public class MonitoredServiceCallTest {
         monitoredServiceWithExecutor.call("irrelevant-request");
         inOrder.verify(mockExecutor)
                 .submit(runnableCaptor.capture());
-        inOrder.verify(latencyConsumer, never())
+        verify(latencyConsumer, never())
                 .accept(any(Duration.class));
 
         runnableCaptor.getValue().run();
