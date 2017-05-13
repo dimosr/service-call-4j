@@ -58,7 +58,7 @@ public class MonitoredServiceCallTest {
         monitoredServiceCall.call("irrelevant-request");
 
         verify(latencyConsumer)
-                .accept(argThat(new SameDurationInMillis(Duration.ofMillis(CALL_LATENCY_IN_MILLISECONDS))));
+                .accept(durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
     }
 
     @Test
@@ -75,7 +75,7 @@ public class MonitoredServiceCallTest {
 
         runnableCaptor.getValue().run();
         inOrder.verify(latencyConsumer)
-                .accept(argThat(new SameDurationInMillis(Duration.ofMillis(CALL_LATENCY_IN_MILLISECONDS))));
+                .accept(durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
     }
 
     @Test
@@ -91,10 +91,10 @@ public class MonitoredServiceCallTest {
         assertThat(actualResponse).isEqualTo(expectedResponse);
     }
 
-    private class SameDurationInMillis implements ArgumentMatcher<Duration> {
+    private static class SameDurationInMillis implements ArgumentMatcher<Duration> {
         private final Duration expectedDuration;
 
-        SameDurationInMillis(final Duration duration) {
+        private SameDurationInMillis(final Duration duration) {
             this.expectedDuration = duration;
         }
 
@@ -102,5 +102,9 @@ public class MonitoredServiceCallTest {
         public boolean matches(Duration duration) {
             return expectedDuration.toMillis() == duration.toMillis();
         }
+    }
+
+    public static Duration durationWithValue(final long milliseconds) {
+        return argThat(new SameDurationInMillis(Duration.ofMillis(milliseconds)));
     }
 }
