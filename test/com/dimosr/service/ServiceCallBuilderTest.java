@@ -10,7 +10,9 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -27,7 +29,7 @@ public class ServiceCallBuilderTest {
     @Mock
     private Cache<String, String> cache;
     @Mock
-    private Consumer<Duration> latencyConsumer;
+    private BiConsumer<Instant, Duration> latencyConsumer;
 
     private final static String SAMPLE_REQUEST = "input";
     private final static String SAMPLE_RESPONSE = "input with some more data";
@@ -74,6 +76,6 @@ public class ServiceCallBuilderTest {
         InOrder orderSensitiveMocks = inOrder(originalServiceCall, cache, latencyConsumer);
         orderSensitiveMocks.verify(cache).get(SAMPLE_REQUEST);
         orderSensitiveMocks.verify(originalServiceCall).call(SAMPLE_REQUEST);
-        orderSensitiveMocks.verify(latencyConsumer).accept(any(Duration.class));
+        orderSensitiveMocks.verify(latencyConsumer).accept(any(Instant.class), any(Duration.class));
     }
 }

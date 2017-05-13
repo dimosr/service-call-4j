@@ -14,7 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,7 +32,7 @@ public class MonitoredServiceCallTest {
     @Mock
     private ServiceCall<String, String> mockRootServiceCall;
     @Mock
-    private Consumer<Duration> latencyConsumer;
+    private BiConsumer<Instant, Duration> latencyConsumer;
     @Mock
     private ExecutorService mockExecutor;
 
@@ -58,7 +58,7 @@ public class MonitoredServiceCallTest {
         monitoredServiceCall.call("irrelevant-request");
 
         verify(latencyConsumer)
-                .accept(durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
+                .accept(instantWithSameMilliseconds(BEFORE_CALL), durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
     }
 
     @Test
@@ -71,11 +71,11 @@ public class MonitoredServiceCallTest {
         inOrder.verify(mockExecutor)
                 .submit(runnableCaptor.capture());
         verify(latencyConsumer, never())
-                .accept(any(Duration.class));
+                .accept(any(Instant.class), any(Duration.class));
 
         runnableCaptor.getValue().run();
         inOrder.verify(latencyConsumer)
-                .accept(durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
+                .accept(instantWithSameMilliseconds(BEFORE_CALL), durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
     }
 
     @Test
@@ -106,5 +106,22 @@ public class MonitoredServiceCallTest {
 
     public static Duration durationWithValue(final long milliseconds) {
         return argThat(new SameDurationInMillis(Duration.ofMillis(milliseconds)));
+    }
+
+    private static class SameInstantInMillis implements ArgumentMatcher<Instant> {
+        private final Instant expectedInstant;
+
+        private SameInstantInMillis(final Instant instant) {
+            this.expectedInstant = instant;
+        }
+
+        @Override
+        public boolean matches(Instant instant) {
+            return instant.toEpochMilli() == instant.toEpochMilli();
+        }
+    }
+
+    public static Instant instantWithSameMilliseconds(final Instant instant) {
+        return argThat(new SameInstantInMillis(instant));
     }
 }

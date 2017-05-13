@@ -5,6 +5,8 @@ import com.dimosr.service.core.ServiceCall;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -33,7 +35,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private ServiceCall<REQUEST, RESPONSE> enhancedServiceCall;
 
     private Cache<REQUEST, RESPONSE> cache;
-    private Consumer<Duration> latencyConsumer;
+    private BiConsumer<Instant, Duration> latencyConsumer;
 
     public ServiceCallBuilder(final ServiceCall<REQUEST, RESPONSE> serviceCall) {
         this.enhancedServiceCall = serviceCall;
@@ -44,7 +46,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
         return this;
     }
 
-    public ServiceCallBuilder<REQUEST, RESPONSE> withMonitoring(final Consumer<Duration> latencyConsumer) {
+    public ServiceCallBuilder<REQUEST, RESPONSE> withMonitoring(final BiConsumer<Instant, Duration> latencyConsumer) {
         this.latencyConsumer = latencyConsumer;
         return this;
     }
