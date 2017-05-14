@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -92,6 +93,24 @@ public class ServiceCallBuilderTest {
         ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
                 .withCache(cache)
                 .withMonitoring(latencyConsumer, executor)
+                .build();
+
+        enhancedServiceCall.call(SAMPLE_REQUEST);
+
+        InOrder orderSensitiveMocks = inOrder(originalServiceCall, cache, latencyConsumer);
+        orderSensitiveMocks.verify(cache).get(SAMPLE_REQUEST);
+        orderSensitiveMocks.verify(originalServiceCall).call(SAMPLE_REQUEST);
+        orderSensitiveMocks.verify(latencyConsumer).accept(any(Instant.class), any(Duration.class));
+    }
+
+    @Test
+    public void testBuildingServiceWithCacheMonitoringAndTimeouts() {
+        ExecutorService executor = MoreExecutors.newDirectExecutorService();
+
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+                .withCache(cache)
+                .withMonitoring(latencyConsumer)
+                .withTimeouts(Duration.ofMillis(1000), TimeUnit.MILLISECONDS, executor)
                 .build();
 
         enhancedServiceCall.call(SAMPLE_REQUEST);

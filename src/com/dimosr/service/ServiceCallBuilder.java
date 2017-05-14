@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -49,10 +50,18 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private ExecutorService monitoringExecutor;
     private BiConsumer<Instant, Duration> latencyConsumer;
 
+    private Duration timeout;
+    private TimeUnit accuracy;
+    private ExecutorService timeoutExecutor;
+
     public ServiceCallBuilder(final ServiceCall<REQUEST, RESPONSE> serviceCall) {
         this.enhancedServiceCall = serviceCall;
     }
 
+    /**
+     * Enabled caching, so that responses from the underlying service will be cached
+     * @param cache, the cache that will be used to cache responses of the services
+     */
     public ServiceCallBuilder<REQUEST, RESPONSE> withCache(Cache<REQUEST, RESPONSE> cache) {
         this.cache = cache;
         return this;
@@ -83,7 +92,21 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
         return this;
     }
 
+    /**
+     * Enables timeout capabilities
+     * @param timeout, the timeout for each call
+     * @param accuracy, the accuracy used for measuring the timeout
+     * @param executor, the executorService that will be used for the timeout functionality
+     */
+    public ServiceCallBuilder<REQUEST, RESPONSE> withTimeouts(final Duration timeout, final TimeUnit accuracy, final ExecutorService executor) {
+        this.timeout = timeout;
+        this.accuracy = accuracy;
+        this.timeoutExecutor = executor;
+        return this;
+    }
+
     public ServiceCall<REQUEST, RESPONSE> build() {
+        wrapWithTimeouts();
         wrapWithMonitoring();
         wrapInCache();
 
@@ -103,6 +126,12 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
             } else {
                 enhancedServiceCall = new MonitoredServiceCall<>(enhancedServiceCall, Clock.systemUTC(), latencyConsumer);
             }
+        }
+    }
+
+    private void wrapWithTimeouts() {
+        if(timeoutExecutor != null) {
+            enhancedServiceCall = new TimingOutServiceCall<>(enhancedServiceCall, timeout, accuracy, timeoutExecutor);
         }
     }
 }
