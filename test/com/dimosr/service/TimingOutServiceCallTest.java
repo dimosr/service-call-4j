@@ -1,7 +1,6 @@
 package com.dimosr.service;
 
-import com.dimosr.service.TimingOutServiceCall;
-import com.dimosr.service.UncheckedTimeoutException;
+import com.dimosr.service.exceptions.UncheckedTimeoutException;
 import com.dimosr.service.core.ServiceCall;
 import org.junit.Before;
 import org.junit.Test;

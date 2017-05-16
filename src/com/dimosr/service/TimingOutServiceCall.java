@@ -1,6 +1,7 @@
 package com.dimosr.service;
 
 import com.dimosr.service.core.ServiceCall;
+import com.dimosr.service.exceptions.UncheckedTimeoutException;
 
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;

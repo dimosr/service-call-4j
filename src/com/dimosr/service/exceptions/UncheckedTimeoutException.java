@@ -1,4 +1,4 @@
-package com.dimosr.service;
+package com.dimosr.service.exceptions;
 
 /**
  * The equivalent unchecked version of TimeoutException
