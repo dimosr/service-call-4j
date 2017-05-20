@@ -15,7 +15,7 @@ import java.util.List;
  */
 class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
-    private final Duration backoffInterval;
+    private final RetryingPolicy retryingPolicy;
     private final int maxRetries;
 
     private final Sleeper sleeper;
@@ -27,16 +27,16 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * A ServiceCall that will be retried, when the underlying serviceCall throws a RetryableException
      *
      * @param serviceCall, the underlying serviceCall that will be called
-     * @param backoffInterval, the duration between a failed call and the next retrial
+     * @param retryingPolicy, the policy defining what the backoff of each retry will be
      * @param maxRetries, the number of maximum retries
      * @param sleeper, a component providing the utility of postponing the execution of the current thread for some period
      */
     public RetryableServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
-                                final Duration backoffInterval,
+                                final RetryingPolicy retryingPolicy,
                                 final int maxRetries,
                                 final Sleeper sleeper) {
         this.serviceCall = serviceCall;
-        this.backoffInterval = backoffInterval;
+        this.retryingPolicy = retryingPolicy;
         this.maxRetries = maxRetries;
         this.sleeper = sleeper;
     }
@@ -46,17 +46,17 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * or one of the exceptions provided in the constructor
      *
      * @param serviceCall, the underlying serviceCall that will be called
-     * @param backoffInterval, the duration between a failed call and the next retrial
+     * @param retryingPolicy, the policy defining what the backoff of each retry will be
      * @param retryableExceptions, the list of exceptions that will be retried
      * @param sleeper, a component providing the utility of postponing the execution of the current thread for some period
      * @param maxRetries, the number of maximum retries
      */
     public RetryableServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
-                                final Duration backoffInterval,
+                                final RetryingPolicy retryingPolicy,
                                 final int maxRetries,
                                 final Sleeper sleeper,
                                 final List<Class<? extends Throwable>> retryableExceptions) {
-        this(serviceCall, backoffInterval, maxRetries, sleeper);
+        this(serviceCall, retryingPolicy, maxRetries, sleeper);
         this.retryableExceptions.addAll(retryableExceptions);
     }
 
@@ -70,13 +70,14 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
                 return serviceCall.call(request);
             } catch(Throwable exception) {
                 if(isRetryable(exception)) {
-                    retriesMade++;
                     finalException = exception;
                     try {
-                        sleeper.sleep(backoffInterval.toMillis());
+                        Duration backoff = retryingPolicy.getRetryBackoff(retriesMade+1);
+                        sleeper.sleep(backoff.toMillis());
                     } catch (InterruptedException e) {
                         throw new MaximumRetriesException("ServiceCall interrupted while retrying", e);
                     }
+                    retriesMade++;
                 } else {
                     throw exception;
                 }
