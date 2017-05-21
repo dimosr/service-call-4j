@@ -66,7 +66,7 @@ public class RetryableServiceCallTest {
         verify(underlyingMockServiceCall, times(1)).call(REQUEST);
         verify(retryingPolicy, never()).getRetryBackoff(anyInt());
         verify(mockSleeper, never()).sleep(anyLong());
-        
+
         assertThat(response).isEqualTo(RESPONSE);
     }
 
