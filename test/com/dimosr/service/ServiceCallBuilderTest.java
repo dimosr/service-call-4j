@@ -39,6 +39,8 @@ public class ServiceCallBuilderTest {
 
     private final static Duration TIMEOUT_THRESHOLD = Duration.ofMillis(1);
 
+    private final static long MAX_REQUESTS_PER_SECOND = 100;
+
 
 
     @Test
@@ -47,6 +49,7 @@ public class ServiceCallBuilderTest {
                 .withCache(cache)
                 .withMonitoring(latencyConsumer)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(100)
                 .withRetrying(false, MAX_RETRIES)
                 .build();
 
@@ -59,6 +62,7 @@ public class ServiceCallBuilderTest {
                 .withCache(cache)
                 .withMonitoring(latencyConsumer, executor)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
                 .withRetrying(true, MAX_RETRIES)
                 .build();
 
@@ -78,7 +82,10 @@ public class ServiceCallBuilderTest {
         assertThat(fourthLayerServiceCall).isInstanceOf(TimingOutServiceCall.class);
 
         ServiceCall fifthLayerServiceCall = getNextLayerServiceCall(fourthLayerServiceCall);
-        assertThat(fifthLayerServiceCall).isEqualTo(originalServiceCall);
+        assertThat(fifthLayerServiceCall).isInstanceOf(ThrottlingServiceCall.class);
+
+        ServiceCall sixthLayerServiceCall = getNextLayerServiceCall(fifthLayerServiceCall);
+        assertThat(sixthLayerServiceCall).isEqualTo(originalServiceCall);
     }
 
     private ServiceCall getNextLayerServiceCall(final ServiceCall serviceCall) throws IllegalAccessException, NoSuchFieldException {

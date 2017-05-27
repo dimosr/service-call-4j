@@ -40,6 +40,8 @@ import java.util.function.BiConsumer;
  * -------------------------------------------------
  * |                 Timeout                       |
  * -------------------------------------------------
+ * |                Throttling                     |
+ * -------------------------------------------------
  * |                ServiceCall                    |
  * -------------------------------------------------
  *                      |
@@ -63,13 +65,16 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private TimeUnit accuracy;
     private ExecutorService timeoutExecutor;
 
+    private boolean isThrottlingEnabled = false;
+    private long maxRequestsPerSecond;
+
     public ServiceCallBuilder(final ServiceCall<REQUEST, RESPONSE> serviceCall) {
         this.enhancedServiceCall = serviceCall;
     }
 
     /**
      * Enables caching, so that responses from the underlying service will be cached
-     * @param cache, the cache that will be used to cache responses of the services
+     * @param cache the cache that will be used to cache responses of the services
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withCache(Cache<REQUEST, RESPONSE> cache) {
         this.cache = cache;
@@ -78,7 +83,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     /**
      * Enables monitoring capabilities
-     * @param latencyConsumer, a lambda function, which will be called back with the latency of each call
+     * @param latencyConsumer a lambda function, which will be called back with the latency of each call
      *
      * Note: the callback will be executed synchronously.
      */
@@ -90,8 +95,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     /**
      * Enables monitoring capabilities
-     * @param latencyConsumer, a lambda function, which will be called back with the latency of each call
-     * @param executorService, the executor that will be used to execute the provided callbacks
+     * @param latencyConsumer a lambda function, which will be called back with the latency of each call
+     * @param executorService the executor that will be used to execute the provided callbacks
      *
      * Note: the callback will be executed asynchronously, using the provided ExecutorService
      */
@@ -103,10 +108,10 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     /**
      * Enables retries, where each retry will be performed after a specific waiting-backoff period
-     * @param backoffPolicy, the backoff policy, which defines how the backoff increases for each retry
-     * @param backoff, the backoff period
-     * @param retryTimeouts, if timeouts will be retried
-     * @param maxRetries, the maximum number of retries that will be performed, before failing the request
+     * @param backoffPolicy the backoff policy, which defines how the backoff increases for each retry
+     * @param backoff the backoff period
+     * @param retryTimeouts if timeouts will be retried
+     * @param maxRetries the maximum number of retries that will be performed, before failing the request
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withRetrying(final BackoffPolicy backoffPolicy, final Duration backoff, final boolean retryTimeouts, final int maxRetries) {
         this.retryingPolicy = new RetryingPolicy(backoffPolicy, backoff);
@@ -117,8 +122,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     /**
      * Enables retries, where retries will be performed directly without waiting-backoff period
-     * @param retryTimeouts, if timeouts will be retried
-     * @param maxRetries, the maximum number of retries that will be performed, before failing the request
+     * @param retryTimeouts if timeouts will be retried
+     * @param maxRetries the maximum number of retries that will be performed, before failing the request
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withRetrying(final boolean retryTimeouts, final int maxRetries) {
         withRetrying(BackoffPolicy.ZERO_BACKOFF, Duration.ZERO, retryTimeouts, maxRetries);
@@ -127,9 +132,9 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     /**
      * Enables timeout capabilities
-     * @param timeout, the timeout for each call
-     * @param accuracy, the accuracy used for measuring the timeout
-     * @param executor, the executorService that will be used for the timeout functionality
+     * @param timeout the timeout for each call
+     * @param accuracy the accuracy used for measuring the timeout
+     * @param executor the executorService that will be used for the timeout functionality
      *
      * Attention: Timeout functionality makes use of future and multiple threads, thus is based on the assumption that the executor is multi-threaded
      *            So, if you provide a single-thread executor, note that the timeout functionality will not be enabled
@@ -141,7 +146,21 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
         return this;
     }
 
+    /**
+     * Enables throttling capabilities
+     * @param maxRequestsPerSecond the maximum number of requests that will be dispatched to the service per second
+     *
+     * Note: the throttling functionality is thread-safe, so the serviceCall can be called by multiple threads
+     *       and the throttling limit will be applied globally, based on the sum of calls of all the threads
+     */
+    public ServiceCallBuilder<REQUEST, RESPONSE> withThrottling(final long maxRequestsPerSecond) {
+        this.isThrottlingEnabled = true;
+        this.maxRequestsPerSecond = maxRequestsPerSecond;
+        return this;
+    }
+
     public ServiceCall<REQUEST, RESPONSE> build() {
+        wrapWithThrottling();
         wrapWithTimeouts();
         wrapWithRetrying();
         wrapWithMonitoring();
@@ -179,6 +198,12 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private void wrapWithTimeouts() {
         if(timeoutExecutor != null) {
             enhancedServiceCall = new TimingOutServiceCall<>(enhancedServiceCall, timeout, accuracy, timeoutExecutor);
+        }
+    }
+
+    private void wrapWithThrottling() {
+        if(isThrottlingEnabled) {
+            enhancedServiceCall = new ThrottlingServiceCall<>(enhancedServiceCall, maxRequestsPerSecond, Clock.systemUTC());
         }
     }
 }
