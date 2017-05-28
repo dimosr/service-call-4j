@@ -6,3 +6,5 @@ jdk:
 branches:
   only:
     - master
+
+#Testing TravisCI pull request build
