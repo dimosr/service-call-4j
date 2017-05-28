@@ -7,7 +7,11 @@ branches:
   only:
     - master
 
-#Environment variables (uses: Coverall secrets)
+#Send coverage reports to coveralls
+after_success:
+  - mvn clean test jacoco:report coveralls:report
+
+#Environment variables (uses: Coveralls secrets)
 env:
   global:
     secure: ZZa7a4YHqj8s4v8hQyb6n4QKd5Iw1lwhkIE2jYILAT5BC05Okiy48oEuLHNgw0mERkYGCvdWut7RhGzWtdeuFskCWeS0pD4jcxcDfwrYP398s4hpHqck1P3yE+y9VNVqyRtE7eH75qgDkCwdQWuTWaA2SgXmFCEvdCNtDl9YJLdYCPdwFG3lykYVxy6EuKq5i9vmCr/YeikhL8vitvLLogMLKc8Bt6Q2S/k3v6Oq0hsgtzZO/KHG7c9j57u54yQ4rUfqfGNYpi4OR4gmk3iz9gyFCG28iOmW7mYVgzDQv0XE24s5+VdCarLnIskqrR/2TfdsU1VrPGH8XQx7DQWnWhIRRjHecTS56fU5/9+iejm5ij+aq0/jlGgp8Dp3efjeddUCVYuZgKSeiQxaAkOHfjTB4DRTZLpy5Wl63gJFAsgoGXcqKqyeTgXMIcliVaz9sQePMFwOun6SjGhJm6x2ozLvmKZCsRf+HFY2Z48vThPKXlGTB/kTRZB3q+YU1n8oQxpP/fSkOORSkiq+/8asTS81wGbYHQqCylrQ5fjGP31FB/Dd6+Gg2peTpEr9bJJARKNEgkRU+NdAkhzRnUg99SWD9Ohu/WhD80h07EUimnTOoazGo6TDLC0Rb+09nc412eEf5lkS52g6wb5hBzLiQ+el0wqs9lz/+boZlxX6Dyg=
