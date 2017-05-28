@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/dimosr/service-call-4j.svg?branch=master)](https://travis-ci.org/dimosr/service-call-4j)
+[![Coverage Status](https://coveralls.io/repos/github/dimosr/service-call-4j/badge.svg?branch=master)](https://coveralls.io/github/dimosr/service-call-4j?branch=master)
 
 ## Service-Call-4j
 
