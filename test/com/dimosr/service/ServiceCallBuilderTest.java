@@ -41,51 +41,129 @@ public class ServiceCallBuilderTest {
 
     private final static long MAX_REQUESTS_PER_SECOND = 100;
 
-
-
     @Test
-    public void builtServiceHasCorrectlyOrderedLayers() throws NoSuchFieldException, IllegalAccessException {
+    public void buildPlainService() throws NoSuchFieldException, IllegalAccessException {
         ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
-                .withCache(cache)
-                .withMonitoring(latencyConsumer)
-                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
-                .withThrottling(100)
-                .withRetrying(false, MAX_RETRIES)
-                .build();
+                                                                .build();
 
-        checkLayersAreInCorrectOrder(enhancedServiceCall);
+        verifyLayersAreInCorrectOrder(enhancedServiceCall);
     }
 
     @Test
-    public void builtServiceWithMonitoringAsyncAndRetryableTimeoutsHasCorrectlyOrderedLayers() throws NoSuchFieldException, IllegalAccessException {
+    public void buildServiceWithThrottling() throws NoSuchFieldException, IllegalAccessException {
         ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
-                .withCache(cache)
-                .withMonitoring(latencyConsumer, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .build();
+
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                ThrottlingServiceCall.class
+        );
+    }
+
+    @Test
+    public void buildServiceWithThrottlingAndTimeouts() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .build();
+
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class
+        );
+    }
+
+    @Test
+    public void buildServiceWithThrottlingTimeoutsAndRetrying() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .withRetrying(false, MAX_RETRIES)
+                .build();
+
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class
+        );
+    }
+
+    @Test
+    public void buildServiceWithThrottlingRetryableTimeoutsAndRetrying() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
                 .withThrottling(MAX_REQUESTS_PER_SECOND)
                 .withRetrying(true, MAX_RETRIES)
                 .build();
 
-        checkLayersAreInCorrectOrder(enhancedServiceCall);
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class
+        );
     }
 
-    private void checkLayersAreInCorrectOrder(final ServiceCall topLevelServiceCall) throws NoSuchFieldException, IllegalAccessException {
-        assertThat(topLevelServiceCall).isInstanceOf(CachedServiceCall.class);
+    @Test
+    public void buildServiceWithThrottlingTimeoutsRetryingAndMonitoring() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+                .withMonitoring(latencyConsumer)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .withRetrying(false, MAX_RETRIES)
+                .build();
 
-        ServiceCall secondLayerServiceCall = getNextLayerServiceCall(topLevelServiceCall);
-        assertThat(secondLayerServiceCall).isInstanceOf(MonitoredServiceCall.class);
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                MonitoredServiceCall.class,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class
+        );
+    }
 
-        ServiceCall thirdLayerServiceCall = getNextLayerServiceCall(secondLayerServiceCall);
-        assertThat(thirdLayerServiceCall).isInstanceOf(RetryableServiceCall.class);
+    @Test
+    public void buildServiceWithThrottlingTimeoutsRetryingAndAsyncMonitoring() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+                .withMonitoring(latencyConsumer, executor)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .withRetrying(false, MAX_RETRIES)
+                .build();
 
-        ServiceCall fourthLayerServiceCall = getNextLayerServiceCall(thirdLayerServiceCall);
-        assertThat(fourthLayerServiceCall).isInstanceOf(TimingOutServiceCall.class);
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                MonitoredServiceCall.class,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class
+        );
+    }
 
-        ServiceCall fifthLayerServiceCall = getNextLayerServiceCall(fourthLayerServiceCall);
-        assertThat(fifthLayerServiceCall).isInstanceOf(ThrottlingServiceCall.class);
+    @Test
+    public void buildServiceWithThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+                .withCache(cache)
+                .withMonitoring(latencyConsumer)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .withRetrying(false, MAX_RETRIES)
+                .build();
 
-        ServiceCall sixthLayerServiceCall = getNextLayerServiceCall(fifthLayerServiceCall);
-        assertThat(sixthLayerServiceCall).isEqualTo(originalServiceCall);
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                CachedServiceCall.class,
+                MonitoredServiceCall.class,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class
+        );
+    }
+
+    private void verifyLayersAreInCorrectOrder(final ServiceCall topLevelServiceCall, final Class<? extends ServiceCall>... intermediateClasses) throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall currentServiceCall = topLevelServiceCall;
+        for(Class<? extends ServiceCall> clazz: intermediateClasses) {
+            assertThat(currentServiceCall).isInstanceOf(clazz);
+            currentServiceCall = getNextLayerServiceCall(currentServiceCall);
+        }
+
+        assertThat(currentServiceCall).isEqualTo(originalServiceCall);
     }
 
     private ServiceCall getNextLayerServiceCall(final ServiceCall serviceCall) throws IllegalAccessException, NoSuchFieldException {

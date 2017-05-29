@@ -7,7 +7,6 @@ import com.dimosr.service.util.Sleeper;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -72,12 +71,12 @@ public class RetryableServiceCallTest {
 
     @Test
     public void whenUnderlyingServiceFailsWithDefaultRetryableExceptionThenRequestIsRetriedAndSucceeds() throws InterruptedException {
-        testRetryableExceptionThrownFromUnderlyingService(RetryableException.class);
+        testRetryableExceptionThrownFromUnderlyingService(new RetryableException("retried for some reason", new RuntimeException()));
     }
 
     @Test
     public void whenUnderlyingServiceFailsWithCustomRetryableExceptionThenRequestIsRetriedAndSucceeds() throws InterruptedException {
-        testRetryableExceptionThrownFromUnderlyingService(CustomException.class);
+        testRetryableExceptionThrownFromUnderlyingService(new CustomException());
     }
 
     @Test(expected = MaximumRetriesException.class)
@@ -108,9 +107,9 @@ public class RetryableServiceCallTest {
         retryableServiceCall.call(REQUEST);
     }
 
-    private void testRetryableExceptionThrownFromUnderlyingService(final Class<? extends Throwable> exceptionThrownClass) throws InterruptedException {
+    private void testRetryableExceptionThrownFromUnderlyingService(final Throwable exceptionThrown) throws InterruptedException {
         when(underlyingMockServiceCall.call(REQUEST))
-                .thenThrow(exceptionThrownClass)
+                .thenThrow(exceptionThrown)
                 .thenReturn(RESPONSE);
 
         String response = retryableServiceCall.call(REQUEST);
