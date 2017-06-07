@@ -32,7 +32,7 @@ class MonitoredServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * @param clock, the clock used to measure latency
      * @param latencyConsumer, the callback that will be provided with the timestamp of the call and the calculated latency
      */
-    public MonitoredServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+    MonitoredServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
                                 final Clock clock,
                                 final BiConsumer<Instant, Duration> latencyConsumer) {
         this.serviceCall = serviceCall;
@@ -49,7 +49,7 @@ class MonitoredServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * @param latencyConsumer, @param latencyConsumer, the callback that will be provided with the timestamp of the call and the calculated latency
      * @param executorService, the executorService that will be used to execute the callback
      */
-    public MonitoredServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+    MonitoredServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
                                 final Clock clock,
                                 final BiConsumer<Instant, Duration> latencyConsumer,
                                 final ExecutorService executorService) {
