@@ -19,6 +19,8 @@ import java.util.function.BiConsumer;
  * - monitoring (latency)
  * - retrying
  * - timeouts
+ * - throttling
+ * - circuit breaker
  *
  * The capabilities are built on top of the provided ServiceCall.
  * The layering is such that there is no interference (or the least possible) between the various capabilities.
@@ -41,6 +43,8 @@ import java.util.function.BiConsumer;
  * |                 Timeout                       |
  * -------------------------------------------------
  * |                Throttling                     |
+ * -------------------------------------------------
+ * |              Circuit Breaker                  |
  * -------------------------------------------------
  * |                ServiceCall                    |
  * -------------------------------------------------
@@ -67,6 +71,12 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     private boolean isThrottlingEnabled = false;
     private long maxRequestsPerSecond;
+
+    private boolean isCircuitBreakerEnabled = false;
+    private int monitoredRequestsWindow;
+    private int minimumFailingRequests;
+    private int consecutiveSuccessfulRequests;
+    private long durationOfOpenState;
 
     public ServiceCallBuilder(final ServiceCall<REQUEST, RESPONSE> serviceCall) {
         this.enhancedServiceCall = serviceCall;
@@ -159,7 +169,40 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
         return this;
     }
 
+    /**
+     * Enabled circuit breaker capabilities
+     * The circuit breaker can be in 3 states: CLOSED, HALF_OPEN, OPEN
+     * - The initial state is CLOSED, where all the calls go through to the Service
+     *   The latest {@code monitoredRequestsWindow} requests are being monitored and if at least
+     *   {@code minimumFailingRequests} of them have failed, then the circuit breaker transitions
+     *   to OPEN state
+     * - When in OPEN state, the circuit breaker fails all requests with a {@code OpenCircuitBreakerException}
+     *   without calling the underlying Service at all. The circuit breaker remains in OPEN state
+     *   for {@code durationOfOpenState} milliseconds and then transitions to HALF_OPEN state
+     * - When in HALF_OPEN state, the circuit breaker starts forwarding the requests to the
+     *   underlying Service again. If the first {@code consecutiveSuccessfulRequests} are all
+     *   successful, then the circuit breaker transitions to CLOSED state. Otherwise, the circuit
+     *   breaker transitions to OPEN state.
+     * @param monitoredRequestsWindow the number of the latest requests that are being monitored when in CLOSED state
+     * @param minimumFailingRequests the number of requests, after which the circuit breaker transitions from CLOSED to OPEN state
+     * @param consecutiveSuccessfulRequests the number of successful requests, after which the circuit breaker transitions from HALF_OPEN to CLOSED state
+     * @param durationOfOpenState the duration of the interval, for which the circuit breaker remains in OPEN state, before
+     *                            transitioning to HALF_OPEN state
+     */
+    public ServiceCallBuilder<REQUEST, RESPONSE> withCircuitBreaker(final int monitoredRequestsWindow,
+                                                                    final int minimumFailingRequests,
+                                                                    final int consecutiveSuccessfulRequests,
+                                                                    final long durationOfOpenState) {
+        this.isCircuitBreakerEnabled = true;
+        this.monitoredRequestsWindow = monitoredRequestsWindow;
+        this.minimumFailingRequests = minimumFailingRequests;
+        this.consecutiveSuccessfulRequests = consecutiveSuccessfulRequests;
+        this.durationOfOpenState = durationOfOpenState;
+        return this;
+    }
+
     public ServiceCall<REQUEST, RESPONSE> build() {
+        wrapWithCircuitBreaker();
         wrapWithThrottling();
         wrapWithTimeouts();
         wrapWithRetrying();
@@ -204,6 +247,12 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private void wrapWithThrottling() {
         if(isThrottlingEnabled) {
             enhancedServiceCall = new ThrottlingServiceCall<>(enhancedServiceCall, maxRequestsPerSecond, Clock.systemUTC());
+        }
+    }
+
+    private void wrapWithCircuitBreaker() {
+        if(isCircuitBreakerEnabled) {
+            enhancedServiceCall = new CircuitBreakingServiceCall<>(enhancedServiceCall, monitoredRequestsWindow, minimumFailingRequests, consecutiveSuccessfulRequests, durationOfOpenState, Clock.systemUTC());
         }
     }
 }

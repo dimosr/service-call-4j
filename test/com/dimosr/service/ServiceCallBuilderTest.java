@@ -41,6 +41,11 @@ public class ServiceCallBuilderTest {
 
     private final static long MAX_REQUESTS_PER_SECOND = 100;
 
+    private final int CIRCUIT_BREAKER_MONITORING_WINDOW = 25;
+    private final int MIN_FAILING_REQUESTS = 10;
+    private final int CONSECUTIVE_SUCCESSFUL_REQUESTS = 5;
+    private final long OPEN_CIRCUIT_DURATION = 500;
+
     @Test
     public void buildPlainService() throws NoSuchFieldException, IllegalAccessException {
         ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
@@ -153,6 +158,27 @@ public class ServiceCallBuilderTest {
                 RetryableServiceCall.class,
                 TimingOutServiceCall.class,
                 ThrottlingServiceCall.class
+        );
+    }
+
+    @Test
+    public void buildServiceWithCircuitBreakerThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+                .withCircuitBreaker(CIRCUIT_BREAKER_MONITORING_WINDOW, MIN_FAILING_REQUESTS, CONSECUTIVE_SUCCESSFUL_REQUESTS, OPEN_CIRCUIT_DURATION)
+                .withCache(cache)
+                .withMonitoring(latencyConsumer)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .withRetrying(false, MAX_RETRIES)
+                .build();
+
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                CachedServiceCall.class,
+                MonitoredServiceCall.class,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class,
+                CircuitBreakingServiceCall.class
         );
     }
 
