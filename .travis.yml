@@ -7,7 +7,7 @@ branches:
   only:
     - master
 
-#Send coverage reports to coveralls
+#Send coverage reports to coveralls (after build is successful)
 after_success:
   - mvn clean test jacoco:report coveralls:report
 
@@ -15,3 +15,14 @@ after_success:
 env:
   global:
     secure: ZZa7a4YHqj8s4v8hQyb6n4QKd5Iw1lwhkIE2jYILAT5BC05Okiy48oEuLHNgw0mERkYGCvdWut7RhGzWtdeuFskCWeS0pD4jcxcDfwrYP398s4hpHqck1P3yE+y9VNVqyRtE7eH75qgDkCwdQWuTWaA2SgXmFCEvdCNtDl9YJLdYCPdwFG3lykYVxy6EuKq5i9vmCr/YeikhL8vitvLLogMLKc8Bt6Q2S/k3v6Oq0hsgtzZO/KHG7c9j57u54yQ4rUfqfGNYpi4OR4gmk3iz9gyFCG28iOmW7mYVgzDQv0XE24s5+VdCarLnIskqrR/2TfdsU1VrPGH8XQx7DQWnWhIRRjHecTS56fU5/9+iejm5ij+aq0/jlGgp8Dp3efjeddUCVYuZgKSeiQxaAkOHfjTB4DRTZLpy5Wl63gJFAsgoGXcqKqyeTgXMIcliVaz9sQePMFwOun6SjGhJm6x2ozLvmKZCsRf+HFY2Z48vThPKXlGTB/kTRZB3q+YU1n8oQxpP/fSkOORSkiq+/8asTS81wGbYHQqCylrQ5fjGP31FB/Dd6+Gg2peTpEr9bJJARKNEgkRU+NdAkhzRnUg99SWD9Ohu/WhD80h07EUimnTOoazGo6TDLC0Rb+09nc412eEf5lkS52g6wb5hBzLiQ+el0wqs9lz/+boZlxX6Dyg=
+
+#Configuration for SonarQube
+addons:
+  sonarqube:
+    organization: "dimosr-github"
+    token:
+      secure: LnYtH93Fl4L1YvHCUJG7+5+49O2x+u3vDCTYGwTITtmvHR/fxe5JFg34uUaZXVKIyIiP+Z8sWojJ4p1kvEOSCdbPtjA3Bd5lp4JtC0RnLeE4e4AhHqt0uc7IyHJZ1fSEuQ9D9XXHPiCdajRFsQ3me+Or1cESF6j7zhjJx++yHOMGmZ9yv7uFECXvJlWpC3Foi/SgsWTAZUJ7/p1WYc0iOMr4JKhuc1nFnqOz2KylFBVYE2bG/0drSi+E8Ln90f4Jx0FJjOAZZuQ6Fa5dRHYt6XFf0HBiv7vctPXYREJAZZFQncgeRbIs/Q1CqCAwKsTDPPWy2Eqe1PsbfTDCbZShF/xDsAE5HMiP21QqMPpn06u8FTLryWdtKA0YmR1D+urqWgjlKO49R3dWDN5+fvb8PW1XQZk7Furmm6w6XCZraaUwnM2HVIl+PHZvafP4XUmm05kp5FTsrkJwsYplZFngU4mlm9698ighjpc3+tJPrPUS4BOqlFoljeQYYlcgidWUSviPvs5ZTeQntFYqu6/nQ6YYeizQidB7mWwTnspx0W6lZ18k2pp2ZzQtznBi0b1D4YZ+IYt12yws/U1YX2tfWtCdCiJXdHxAQyt2ABpoBQRfkoIeZuRq023w/LoU5AJ2Gbs5ZD8XnKSC0humcc06GBjv2EE0ZU+b+xYe79mYGmA=
+
+#Build script
+script:
+  - mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent install sonar:sonar
