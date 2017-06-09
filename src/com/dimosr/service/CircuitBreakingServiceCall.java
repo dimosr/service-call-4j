@@ -41,7 +41,7 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
             RESPONSE response = serviceCall.call(request);
             circuitBreaker.updateState(CircuitBreaker.RequestResult.SUCCESS);
             return response;
-        } catch(Throwable e) {
+        } catch(Exception e) {
             circuitBreaker.updateState(CircuitBreaker.RequestResult.FAILURE);
             throw e;
         }
@@ -87,23 +87,33 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
                 halfOpenRequestQueue.addItem(requestResult);
 
                 if (state == CircuitBreakerState.HALF_OPEN) {
-                    if(halfOpenRequestQueue.isFull()) {
-                        if (halfOpenRequestQueue.getOccurences(RequestResult.SUCCESS) >= consecutiveSuccessfulRequestsToClose) {
+                    if(allSamplingRequestsCompleted()) {
+                        if (allSamplingRequestsSuccessful()) {
                             closeCircuit();
                         } else {
                             openCircuit();
                         }
                     }
-                } else if (state == CircuitBreakerState.CLOSED) {
-                    if (closedRequestQueue.getOccurences(RequestResult.FAILURE) >= failingRequestsToOpen) {
+                } else if (state == CircuitBreakerState.CLOSED && moreFailuresThanAcceptable()) {
                         openCircuit();
-                    }
                 }
             }
         }
 
         private boolean hasOpenDurationExpired() {
             return clock.millis() - lastOpenedTimestamp > openDurationInMilliseconds;
+        }
+
+        private boolean moreFailuresThanAcceptable() {
+            return closedRequestQueue.getOccurences(RequestResult.FAILURE) >= failingRequestsToOpen;
+        }
+
+        private boolean allSamplingRequestsCompleted() {
+            return halfOpenRequestQueue.isFull();
+        }
+
+        private boolean allSamplingRequestsSuccessful() {
+            return halfOpenRequestQueue.getOccurences(RequestResult.SUCCESS) >= consecutiveSuccessfulRequestsToClose;
         }
 
         private void openCircuit() {

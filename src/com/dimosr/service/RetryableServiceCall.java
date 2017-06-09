@@ -4,9 +4,9 @@ import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.MaximumRetriesException;
 import com.dimosr.service.exceptions.RetryableException;
 import com.dimosr.service.util.Sleeper;
+import com.google.common.collect.Lists;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -20,8 +20,7 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
 
     private final Sleeper sleeper;
 
-    private final List<Class> retryableExceptions = new ArrayList<>();
-    {retryableExceptions.add(RetryableException.class);}
+    private final List<Class> retryableExceptions = Lists.newArrayList(RetryableException.class);
 
     /**
      * A ServiceCall that will be retried, when the underlying serviceCall throws a RetryableException
@@ -68,7 +67,7 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
         while(retriesMade <= maxRetries) {
             try {
                 return serviceCall.call(request);
-            } catch(Throwable exception) {
+            } catch(Exception exception) {
                 if(isRetryable(exception)) {
                     finalException = exception;
                     try {

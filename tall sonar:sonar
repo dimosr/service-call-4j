@@ -1,0 +1,108 @@
+[1mdiff --git a/src/com/dimosr/service/CircuitBreakingServiceCall.java b/src/com/dimosr/service/CircuitBreakingServiceCall.java[m
+[1mindex 4296ab9..9dc6786 100644[m
+[1m--- a/src/com/dimosr/service/CircuitBreakingServiceCall.java[m
+[1m+++ b/src/com/dimosr/service/CircuitBreakingServiceCall.java[m
+[36m@@ -41,7 +41,7 @@[m [mclass CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE[m
+             RESPONSE response = serviceCall.call(request);[m
+             circuitBreaker.updateState(CircuitBreaker.RequestResult.SUCCESS);[m
+             return response;[m
+[31m-        } catch(Throwable e) {[m
+[32m+[m[32m        } catch(Exception e) {[m
+             circuitBreaker.updateState(CircuitBreaker.RequestResult.FAILURE);[m
+             throw e;[m
+         }[m
+[36m@@ -87,17 +87,15 @@[m [mclass CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE[m
+                 halfOpenRequestQueue.addItem(requestResult);[m
+ [m
+                 if (state == CircuitBreakerState.HALF_OPEN) {[m
+[31m-                    if(halfOpenRequestQueue.isFull()) {[m
+[31m-                        if (halfOpenRequestQueue.getOccurences(RequestResult.SUCCESS) >= consecutiveSuccessfulRequestsToClose) {[m
+[32m+[m[32m                    if(allSamplingRequestsCompleted()) {[m
+[32m+[m[32m                        if (allSamplingRequestsSuccessful()) {[m
+                             closeCircuit();[m
+                         } else {[m
+                             openCircuit();[m
+                         }[m
+                     }[m
+[31m-                } else if (state == CircuitBreakerState.CLOSED) {[m
+[31m-                    if (closedRequestQueue.getOccurences(RequestResult.FAILURE) >= failingRequestsToOpen) {[m
+[32m+[m[32m                } else if (state == CircuitBreakerState.CLOSED && moreFailuresThanAcceptable()) {[m
+                         openCircuit();[m
+[31m-                    }[m
+                 }[m
+             }[m
+         }[m
+[36m@@ -106,6 +104,18 @@[m [mclass CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE[m
+             return clock.millis() - lastOpenedTimestamp > openDurationInMilliseconds;[m
+         }[m
+ [m
+[32m+[m[32m        private boolean moreFailuresThanAcceptable() {[m
+[32m+[m[32m            return closedRequestQueue.getOccurences(RequestResult.FAILURE) >= failingRequestsToOpen;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        private boolean allSamplingRequestsCompleted() {[m
+[32m+[m[32m            return halfOpenRequestQueue.isFull();[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        private boolean allSamplingRequestsSuccessful() {[m
+[32m+[m[32m            return halfOpenRequestQueue.getOccurences(RequestResult.SUCCESS) >= consecutiveSuccessfulRequestsToClose;[m
+[32m+[m[32m        }[m
+[32m+[m
+         private void openCircuit() {[m
+             state = CircuitBreakerState.OPEN;[m
+             lastOpenedTimestamp = clock.millis();[m
+[1mdiff --git a/src/com/dimosr/service/RetryableServiceCall.java b/src/com/dimosr/service/RetryableServiceCall.java[m
+[1mindex 6b40053..7e080c0 100644[m
+[1m--- a/src/com/dimosr/service/RetryableServiceCall.java[m
+[1m+++ b/src/com/dimosr/service/RetryableServiceCall.java[m
+[36m@@ -4,9 +4,11 @@[m [mimport com.dimosr.service.core.ServiceCall;[m
+ import com.dimosr.service.exceptions.MaximumRetriesException;[m
+ import com.dimosr.service.exceptions.RetryableException;[m
+ import com.dimosr.service.util.Sleeper;[m
+[32m+[m[32mimport com.google.common.collect.Lists;[m
+ [m
+ import java.time.Duration;[m
+ import java.util.ArrayList;[m
+[32m+[m[32mimport java.util.Arrays;[m
+ import java.util.List;[m
+ [m
+ /**[m
+[36m@@ -20,8 +22,7 @@[m [mclass RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE[m
+ [m
+     private final Sleeper sleeper;[m
+ [m
+[31m-    private final List<Class> retryableExceptions = new ArrayList<>();[m
+[31m-    {retryableExceptions.add(RetryableException.class);}[m
+[32m+[m[32m    private final List<Class> retryableExceptions = Lists.newArrayList(RetryableException.class);[m
+ [m
+     /**[m
+      * A ServiceCall that will be retried, when the underlying serviceCall throws a RetryableException[m
+[36m@@ -68,13 +69,14 @@[m [mclass RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE[m
+         while(retriesMade <= maxRetries) {[m
+             try {[m
+                 return serviceCall.call(request);[m
+[31m-            } catch(Throwable exception) {[m
+[32m+[m[32m            } catch(Exception exception) {[m
+                 if(isRetryable(exception)) {[m
+                     finalException = exception;[m
+                     try {[m
+                         Duration backoff = retryingPolicy.getRetryBackoff(retriesMade+1);[m
+                         sleeper.sleep(backoff.toMillis());[m
+                     } catch (InterruptedException e) {[m
+[32m+[m[32m                        Thread.currentThread().interrupt();[m
+                         throw new MaximumRetriesException("ServiceCall interrupted while retrying", e);[m
+                     }[m
+                     retriesMade++;[m
+[1mdiff --git a/src/com/dimosr/service/RetryingPolicy.java b/src/com/dimosr/service/RetryingPolicy.java[m
+[1mindex ec8a0f3..7a54064 100644[m
+[1m--- a/src/com/dimosr/service/RetryingPolicy.java[m
+[1m+++ b/src/com/dimosr/service/RetryingPolicy.java[m
+[36m@@ -49,7 +49,7 @@[m [mclass RetryingPolicy {[m
+                 Duration linearBackoff = backoffInterval.multipliedBy(retry);[m
+                 return linearBackoff;[m
+             case EXPONENTIAL_BACKOFF:[m
+[31m-                Duration exponentialBackoff = backoffInterval.multipliedBy((long) Math.pow(2, retry-1));[m
+[32m+[m[32m                Duration exponentialBackoff = backoffInterval.multipliedBy((long) Math.pow(2.0, retry-1));[m
+                 return exponentialBackoff;[m
+             default:[m
+                 throw new IllegalArgumentException("Invalid backoff policy: " + backoffPolicy);[m
