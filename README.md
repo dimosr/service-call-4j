@@ -4,7 +4,49 @@
 
 ## Service-Call-4j
 
-A library for enhancing your serviceCall calls with several additional features
+A library for adding resiliency capabilities to your RPCs (Remote Procedure Calls) in a declarative way. The capabilities provided by this library currently are the following:
+* Caching
+* Monitoring
+* Retrying
+* Timeout
+* Throttling
+* Circuit Breaker
+
+### Getting Started
+
+1. Make sure the call you want to enhance implements the **ServiceCall** interface provided by Service-Call-4j:
+```java
+public interface ServiceCall<REQUEST, RESPONSE> {
+    RESPONSE call(REQUEST request);
+}
+
+...
+
+public class MyAdjustedHelloWorldCall implements ServiceCall<String, String> {
+	String call(String input) {
+		return "Hello " + input;
+	}
+}
+```
+
+2. Use the provided **Builder** to build your enhanced ServiceCall:
+```java
+ServiceCall<String, String> enhancedHelloWorldCall = new ServiceCallBuilder<>(new MyAdjustedHelloWorldCall())
+                .withCircuitBreaker(15, 5, 3, 300)
+                .withCache(cache)
+                .withMonitoring((i, d) -> System.out.println("Duration: " + d.toMillis()))
+                .withTimeouts(Duration.ofMillis(1), TimeUnit.MILLISECONDS, Executors.newFixedThreadPool(10))
+                .withThrottling(100)
+                .withRetrying(false, 2)
+                .build();
+```
+
+3. Perform your calls
+```java
+String response = enhancedHelloWorldCall.call("World");
+```
+
+Check the project's Wiki for more documentation about how each capability can be used.
 
 ### Build Process
 
@@ -18,7 +60,24 @@ Execute unit tests
 mvn test
 ```
 
-Build and package into .jar
+Compile, run unit tests, package into .jar and generate unit-test, surefire reports
 ```sh
 mvn package
 ```
+
+### Contributing
+
+There are many ways you can contribute to the project:
+* by opening issues for existing **bugs** in the project
+* by adding new **features/capabilities** to the library
+* by **benchmarking** some of the capabilities of the library and providing the results!
+* by letting us know if you are using the library in production (and **your experience**)
+
+The library operates under a CI/CD model. Every pull-request is automatically built by TravisCI and a set of code coverage and quality tests are being performed, before being approved. So, in order to contribute a bug-fix or a feature:
+* make sure that you can build successfully the project, without breaking existing tests
+* make sure you have added sufficient unit testing (& be prepared to justify any missing scenario) for new code
+* make a pull request and wait for someone to review it, we try to be as responsive as possible :)
+
+A final tip for adding new features to the library:
+* The library makes extensive use of the the Decorator design pattern. So, please try to comply with this design decision, by implementing your new capability as a new ServiceCall and then adding it in the Builder.
+* Feel free to open an issue for a missing feature, so that we can first have a fruitful discussion about it. This will help both you and us making potential design decisions, making the pull-request review much smoother.
