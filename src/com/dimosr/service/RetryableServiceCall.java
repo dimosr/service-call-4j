@@ -74,6 +74,7 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
                         Duration backoff = retryingPolicy.getRetryBackoff(retriesMade+1);
                         sleeper.sleep(backoff.toMillis());
                     } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                         throw new MaximumRetriesException("ServiceCall interrupted while retrying", e);
                     }
                     retriesMade++;

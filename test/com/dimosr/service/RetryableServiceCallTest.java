@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
@@ -98,13 +99,19 @@ public class RetryableServiceCallTest {
         retryableServiceCall.call(REQUEST);
     }
 
-    @Test(expected = MaximumRetriesException.class)
-    public void whenInterruptedWhileSleepingThenRetryingIsAborted() throws InterruptedException {
+    @Test
+    public void whenInterruptedWhileSleepingThenRetryingIsAbortedAndInterruptStatusSet() throws InterruptedException {
         when(underlyingMockServiceCall.call(REQUEST))
                 .thenThrow(RetryableException.class);
         doThrow(InterruptedException.class).when(mockSleeper).sleep(anyLong());
 
-        retryableServiceCall.call(REQUEST);
+        try {
+            retryableServiceCall.call(REQUEST);
+
+            fail("Expected exception was not thrown");
+        } catch(MaximumRetriesException e) {
+            assertThat(Thread.interrupted()).isTrue();
+        }
     }
 
     private void testRetryableExceptionThrownFromUnderlyingService(final Throwable exceptionThrown) throws InterruptedException {

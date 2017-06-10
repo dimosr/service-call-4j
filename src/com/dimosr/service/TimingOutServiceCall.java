@@ -46,7 +46,10 @@ class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
         } catch (TimeoutException e) {
             String message = String.format("Service call timed out after %d %s", timeout, accuracy);
             throw new UncheckedTimeoutException(message, e);
-        } catch(InterruptedException|ExecutionException e) {
+        } catch(ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch(InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
 

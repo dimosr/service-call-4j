@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -69,7 +70,20 @@ public class TimingOutServiceCallTest {
         when(responseFuture.get(TIMEOUT.toMillis(), ACCURACY))
                 .thenThrow(ExecutionException.class);
 
-        String response = timingOutServiceCall.call(REQUEST);
+        timingOutServiceCall.call(REQUEST);
+    }
+
+    @Test
+    public void whenFutureIsInterruptedThenRuntimeExceptionIsThrownAndInterruptStatusSet() throws InterruptedException, ExecutionException, TimeoutException {
+        when(responseFuture.get(TIMEOUT.toMillis(), ACCURACY))
+                .thenThrow(InterruptedException.class);
+        try {
+            timingOutServiceCall.call(REQUEST);
+
+            fail("Expected exception not thrown");
+        } catch (RuntimeException e) {
+            assertThat(Thread.interrupted()).isTrue();
+        }
     }
 
     @Test(expected = UnsupportedOperationException.class)
