@@ -1,5 +1,6 @@
 package com.dimosr.service;
 
+import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.MaximumRetriesException;
 import com.dimosr.service.exceptions.RetryableException;
@@ -10,6 +11,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Arrays;
 
@@ -34,6 +36,12 @@ public class RetryableServiceCallTest {
     private Sleeper mockSleeper;
     @Mock
     private RetryingPolicy retryingPolicy;
+    @Mock
+    private MetricsCollector metricsCollector;
+    @Mock
+    private Clock clock;
+
+    private static final String METRIC_FOR_RETRIES = "ServiceCall.Retries";
 
     private static class CustomException extends RuntimeException{}
 
@@ -53,7 +61,9 @@ public class RetryableServiceCallTest {
                 retryingPolicy,
                 RETRIES,
                 mockSleeper,
-                Arrays.asList(CustomException.class));
+                Arrays.asList(CustomException.class),
+                metricsCollector,
+                clock);
     }
 
     @Test
@@ -66,6 +76,8 @@ public class RetryableServiceCallTest {
         verify(underlyingMockServiceCall, times(1)).call(REQUEST);
         verify(retryingPolicy, never()).getRetryBackoff(anyInt());
         verify(mockSleeper, never()).sleep(anyLong());
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_RETRIES), eq(0.0d), any());
 
         assertThat(response).isEqualTo(RESPONSE);
     }
@@ -73,30 +85,48 @@ public class RetryableServiceCallTest {
     @Test
     public void whenUnderlyingServiceFailsWithDefaultRetryableExceptionThenRequestIsRetriedAndSucceeds() throws InterruptedException {
         testRetryableExceptionThrownFromUnderlyingService(new RetryableException("retried for some reason", new RuntimeException()));
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_RETRIES), eq(1.0d), any());
     }
 
     @Test
     public void whenUnderlyingServiceFailsWithCustomRetryableExceptionThenRequestIsRetriedAndSucceeds() throws InterruptedException {
         testRetryableExceptionThrownFromUnderlyingService(new CustomException());
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_RETRIES), eq(1.0d), any());
     }
 
-    @Test(expected = MaximumRetriesException.class)
+    @Test
     public void whenUnderlyingServiceFailsWithRetryableExceptionManyTimesThenRequestEventuallyFails() throws InterruptedException {
         when(underlyingMockServiceCall.call(REQUEST))
                 .thenThrow(RetryableException.class);
 
-        retryableServiceCall.call(REQUEST);
-
+        try {
+            retryableServiceCall.call(REQUEST);
+            fail("Expected exception not thrown");
+        } catch(MaximumRetriesException e) {
+            /* Nothing to do - verified that exception was thrown */
+        }
         verify(underlyingMockServiceCall, times(3)).call(REQUEST);
         verify(mockSleeper, times(3)).sleep(POLICY_BACKOFF_INTERVAL.toMillis());
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_RETRIES), eq(2.0d), any());
     }
 
-    @Test(expected = NullPointerException.class)
+    @Test
     public void whenUnderlyingServiceFailsWithNonRetryableExceptionThenRequestFailsAndExceptionPropagates() {
         when(underlyingMockServiceCall.call(REQUEST))
                 .thenThrow(NullPointerException.class);
 
-        retryableServiceCall.call(REQUEST);
+        try {
+            retryableServiceCall.call(REQUEST);
+            fail("Expected exception not thrown");
+        } catch(NullPointerException e) {
+            /* Nothing to do - verified that exception was thrown */
+        }
+
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_RETRIES), eq(0.0d), any());
     }
 
     @Test

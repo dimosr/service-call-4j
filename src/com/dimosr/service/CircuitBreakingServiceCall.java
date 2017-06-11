@@ -1,5 +1,6 @@
 package com.dimosr.service;
 
+import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.OpenCircuitBreakerException;
 import com.dimosr.service.util.StatisticsQueue;
@@ -9,6 +10,11 @@ import java.time.Clock;
 class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
     private final CircuitBreaker circuitBreaker;
+
+    private final MetricsCollector metricsCollector;
+    private final Clock clock;
+
+    private static final String METRIC_TEMPLATE = "ServiceCall.CircuitBreaker.state.%s";
 
     /**
      * Returns a ServiceCall with circuit-breaking capabiliies
@@ -22,18 +28,23 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
      * @param clock, the clock that will be used to measure the intervals
      */
     CircuitBreakingServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
-                                      final int requestsWindow,
-                                      final int failingRequestsToOpen,
-                                      final int consecutiveSuccessfulRequestsToClose,
-                                      final long durationOfOpenInMilliseconds,
-                                      final Clock clock) {
+                               final int requestsWindow,
+                               final int failingRequestsToOpen,
+                               final int consecutiveSuccessfulRequestsToClose,
+                               final long durationOfOpenInMilliseconds,
+                               final Clock clock,
+                               final MetricsCollector metricsCollector) {
         this.serviceCall = serviceCall;
         this.circuitBreaker = new CircuitBreaker(requestsWindow, failingRequestsToOpen, consecutiveSuccessfulRequestsToClose, durationOfOpenInMilliseconds, clock);
+        this.metricsCollector = metricsCollector;
+        this.clock = clock;
     }
 
     @Override
     public RESPONSE call(REQUEST request) {
-        if(circuitBreaker.getState() == CircuitBreaker.CircuitBreakerState.OPEN) {
+        CircuitBreaker.CircuitBreakerState currentState = circuitBreaker.getState();
+        emitMetrics(currentState);
+        if(currentState == CircuitBreaker.CircuitBreakerState.OPEN) {
             throw new OpenCircuitBreakerException("Circuit breaker is opened, request to underlying service was not made.");
         }
 
@@ -45,6 +56,11 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
             circuitBreaker.updateState(CircuitBreaker.RequestResult.FAILURE);
             throw e;
         }
+    }
+
+    private void emitMetrics(final CircuitBreaker.CircuitBreakerState state) {
+        final String metricNamespace = String.format(METRIC_TEMPLATE, state);
+        metricsCollector.putMetric(metricNamespace, 1, clock.instant());
     }
 
     private static class CircuitBreaker {

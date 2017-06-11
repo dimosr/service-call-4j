@@ -1,5 +1,6 @@
 package com.dimosr.service;
 
+import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.ThrottledException;
 
@@ -20,22 +21,28 @@ class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, R
     private final Lock readLock = readWriteLock.readLock();
     private final Lock writeLock = readWriteLock.writeLock();
 
+    private final MetricsCollector metricsCollector;
+
     private static final long SECOND_IN_MILLISECONDS = 1000;
+
+    private static final String METRIC_TEMPLATE = "ServiceCall.Throttling";
 
     public ThrottlingServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
                                  final long maxRequestsPerSecond,
-                                 final Clock clock) {
+                                 final Clock clock,
+                                 final MetricsCollector metricsCollector) {
         this.serviceCall = serviceCall;
         this.maxRequestsPerSecond = maxRequestsPerSecond;
         this.clock = clock;
         requestsCounter = new AtomicLong(0);
         currentSecondTimestamp = truncateToSecond(clock.millis());
+        this.metricsCollector = metricsCollector;
     }
 
     @Override
     public RESPONSE call(REQUEST request) {
         resetStateIfSecondPassed();
-        countRequestInCurrentSecond();
+        checkIfThresholdCrossed();
 
         return serviceCall.call(request);
     }
@@ -73,15 +80,18 @@ class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, R
      *
      * This method throws a ThrottledException in case the sum of requests exceed the provided threshold
      */
-    private void countRequestInCurrentSecond() {
+    private void checkIfThresholdCrossed() {
         readLock.lock();
         try {
             if(requestsCounter.incrementAndGet() > maxRequestsPerSecond) {
+                emitMetric(1);
                 throw new ThrottledException(String.format(
                         "Request was throttled, there were %s requests in the current second, while the threshold is: %s",
                         requestsCounter.get(),
                         maxRequestsPerSecond)
                 );
+            } else {
+                emitMetric(0);
             }
         } finally {
             readLock.unlock();
@@ -98,5 +108,9 @@ class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, R
      */
     private long truncateToSecond(long timestampInMilliseconds) {
         return (timestampInMilliseconds / 1000) * 1000;
+    }
+
+    private void emitMetric(final int throttledRequests) {
+        metricsCollector.putMetric(METRIC_TEMPLATE, throttledRequests, clock.instant());
     }
 }

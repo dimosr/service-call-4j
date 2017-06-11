@@ -20,6 +20,8 @@ class ProfiledServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RES
     private final Clock clock;
     private MetricsCollector metricsCollector;
 
+    private static final String METRIC_TEMPLATE = "ServiceCall.latency";
+
     /**
      * Constructs a profiled serviceCall, that will call the underlying serviceCall and emit metrics around latency
      * using the provided metricsCollector
@@ -49,6 +51,6 @@ class ProfiledServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RES
     }
 
     private void emitLatencyMetric(final Instant timestamp, final Duration callDuration) {
-        metricsCollector.putMetric("ServiceCall.latency", callDuration.toMillis(), timestamp);
+        metricsCollector.putMetric(METRIC_TEMPLATE, callDuration.toMillis(), timestamp);
     }
 }

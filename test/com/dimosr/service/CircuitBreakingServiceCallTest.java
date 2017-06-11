@@ -1,10 +1,12 @@
 package com.dimosr.service;
 
+import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.OpenCircuitBreakerException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.MockitoJUnitRunner;
@@ -12,6 +14,12 @@ import org.mockito.stubbing.Answer;
 
 import java.time.Clock;
 
+import static junit.framework.TestCase.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -21,6 +29,8 @@ public class CircuitBreakingServiceCallTest {
     private Clock clock;
     @Mock
     private ServiceCall<String, String> rootServiceCall;
+    @Mock
+    private MetricsCollector metricsCollector;
 
     private static final int REQUESTS_WINDOW = 10;
     private static final int FAILURES_OPEN_THRESHOLD = 3;
@@ -36,6 +46,10 @@ public class CircuitBreakingServiceCallTest {
 
     private long clockTime = 0;
 
+    private static final String METRIC_FOR_CLOSED = "ServiceCall.CircuitBreaker.state.CLOSED";
+    private static final String METRIC_FOR_HALF_OPEN = "ServiceCall.CircuitBreaker.state.HALF_OPEN";
+    private static final String METRIC_FOR_OPEN = "ServiceCall.CircuitBreaker.state.OPEN";
+
     @Before
     public void setup() {
         serviceCall = new CircuitBreakingServiceCall<>(rootServiceCall,
@@ -43,7 +57,8 @@ public class CircuitBreakingServiceCallTest {
                                                        FAILURES_OPEN_THRESHOLD,
                                                        SUCCESSES_CLOSE_THRESHOLD,
                                                        HALF_OPEN_DURATION_MILLISECONDS,
-                                                       clock);
+                                                       clock,
+                                                       metricsCollector);
         setupRootService();
         setupClock();
     }
@@ -72,12 +87,24 @@ public class CircuitBreakingServiceCallTest {
     @Test
     public void whenAllRequestsAreSuccessfulCircuitBreakerRemainsClosed() {
         createSuccessfulRequests(REQUESTS_WINDOW);
+
+        verify(metricsCollector, times(REQUESTS_WINDOW))
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
     }
 
-    @Test(expected = OpenCircuitBreakerException.class)
+    @Test
     public void whenMoreRequestsThanThresholdAreFailingInsideWindowCircuitBreakerOpens() {
         createFailingRequests(FAILURES_OPEN_THRESHOLD);
-        createSuccessfulRequests(1);
+
+        try {
+            createSuccessfulRequests(1);
+        } catch (OpenCircuitBreakerException e) {
+            /* Nothing to do - verified that exception was thrown */
+        }
+        verify(metricsCollector, times(FAILURES_OPEN_THRESHOLD))
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_OPEN), eq((double)1), any());
     }
 
     @Test
@@ -86,6 +113,9 @@ public class CircuitBreakingServiceCallTest {
         createSuccessfulRequests(REQUESTS_WINDOW);
         createFailingRequests(1);
         createSuccessfulRequests(1);
+
+        verify(metricsCollector, times(FAILURES_OPEN_THRESHOLD-1 + REQUESTS_WINDOW + 1 + 1))
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
     }
 
     @Test
@@ -94,6 +124,11 @@ public class CircuitBreakingServiceCallTest {
         advanceClockTime(HALF_OPEN_DURATION_MILLISECONDS+1);
 
         createSuccessfulRequests(1);
+
+        verify(metricsCollector, times(FAILURES_OPEN_THRESHOLD))
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_HALF_OPEN), eq((double)1), any());
     }
 
     @Test
@@ -104,9 +139,17 @@ public class CircuitBreakingServiceCallTest {
         createSuccessfulRequests(SUCCESSES_CLOSE_THRESHOLD);
 
         createFailingRequests(1);
+
+        InOrder inOrder = inOrder(metricsCollector);
+        inOrder.verify(metricsCollector, times(FAILURES_OPEN_THRESHOLD))
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
+        inOrder.verify(metricsCollector, times(SUCCESSES_CLOSE_THRESHOLD))
+                .putMetric(eq(METRIC_FOR_HALF_OPEN), eq((double)1), any());
+        inOrder.verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
     }
 
-    @Test(expected = OpenCircuitBreakerException.class)
+    @Test
     public void whenInHalfOpenStateIfNumberOfConsecutiveRequestsDontSucceedThenCircuitOpensAgain() {
         createFailingRequests(FAILURES_OPEN_THRESHOLD);
         advanceClockTime(HALF_OPEN_DURATION_MILLISECONDS+1);
@@ -114,7 +157,19 @@ public class CircuitBreakingServiceCallTest {
         createSuccessfulRequests(SUCCESSES_CLOSE_THRESHOLD-1);
         createFailingRequests(1);
 
-        createSuccessfulRequests(1);
+        try {
+            createSuccessfulRequests(1);
+            fail("Expected exception not thrown");
+        } catch (OpenCircuitBreakerException e) {
+            /* Nothing to do - verified that exception was thrown */
+        }
+        InOrder inOrder = inOrder(metricsCollector);
+        inOrder.verify(metricsCollector, times(FAILURES_OPEN_THRESHOLD))
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
+        inOrder.verify(metricsCollector, times(SUCCESSES_CLOSE_THRESHOLD))
+                .putMetric(eq(METRIC_FOR_HALF_OPEN), eq((double)1), any());
+        inOrder.verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_OPEN), eq((double)1), any());
     }
 
     private void createSuccessfulRequests(final int requestsNumber) {

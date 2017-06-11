@@ -1,5 +1,6 @@
 package com.dimosr.service;
 
+import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.exceptions.UncheckedTimeoutException;
 import com.dimosr.service.core.ServiceCall;
 import org.junit.Before;
@@ -8,6 +9,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -20,6 +22,8 @@ import java.util.concurrent.TimeoutException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -31,6 +35,10 @@ public class TimingOutServiceCallTest {
     private ExecutorService executorService;
     @Mock
     private Future responseFuture;
+    @Mock
+    private Clock clock;
+    @Mock
+    private MetricsCollector metricsCollector;
 
     private ServiceCall<String, String> timingOutServiceCall;
 
@@ -40,9 +48,11 @@ public class TimingOutServiceCallTest {
     private static final String REQUEST = "request";
     private static final String RESPONSE = "response";
 
+    private static final String METRIC_FOR_TIMEOUTS = "ServiceCall.Timeouts";
+
     @Before
     public void setupServiceCall() {
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, TIMEOUT, ACCURACY, executorService);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, TIMEOUT, ACCURACY, executorService, clock, metricsCollector);
 
         when(executorService.submit(any(Callable.class)))
                 .thenReturn(responseFuture);
@@ -55,14 +65,24 @@ public class TimingOutServiceCallTest {
         String response = timingOutServiceCall.call(REQUEST);
 
         assertThat(response).isEqualTo(RESPONSE);
+
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_TIMEOUTS), eq(0.0d), any());
     }
 
-    @Test(expected = UncheckedTimeoutException.class)
+    @Test
     public void whenUnderlyingCallTimeoutsThenExceptionIsThrown() throws InterruptedException, ExecutionException, TimeoutException {
         when(responseFuture.get(TIMEOUT.toMillis(), ACCURACY))
                 .thenThrow(TimeoutException.class);
 
-        String response = timingOutServiceCall.call(REQUEST);
+        try {
+            timingOutServiceCall.call(REQUEST);
+            fail("Expected exception not thrown");
+        } catch (UncheckedTimeoutException e) {
+            /* Nothing to do - verified that exception was thrown */
+        }
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_TIMEOUTS), eq(1.0d), any());
     }
 
     @Test(expected = RuntimeException.class)
@@ -88,17 +108,17 @@ public class TimingOutServiceCallTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void timingOutServiceCannotWorkWithMicroseconds() {
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofNanos(10000), TimeUnit.MICROSECONDS, executorService);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofNanos(10000), TimeUnit.MICROSECONDS, executorService, clock, metricsCollector);
     }
 
     @Test
     public void timingOutServiceCanWorkWithAllOtherTimeUnits() {
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofNanos(10000), TimeUnit.NANOSECONDS, executorService);
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofMillis(10000), TimeUnit.MILLISECONDS, executorService);
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofSeconds(10000), TimeUnit.SECONDS, executorService);
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofMinutes(10000), TimeUnit.MINUTES, executorService);
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofHours(10000), TimeUnit.HOURS, executorService);
-        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofDays(10000), TimeUnit.DAYS, executorService);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofNanos(10000), TimeUnit.NANOSECONDS, executorService, clock, metricsCollector);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofMillis(10000), TimeUnit.MILLISECONDS, executorService, clock, metricsCollector);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofSeconds(10000), TimeUnit.SECONDS, executorService, clock, metricsCollector);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofMinutes(10000), TimeUnit.MINUTES, executorService, clock, metricsCollector);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofHours(10000), TimeUnit.HOURS, executorService, clock, metricsCollector);
+        timingOutServiceCall = new TimingOutServiceCall<>(underlyingServiceCall, Duration.ofDays(10000), TimeUnit.DAYS, executorService, clock, metricsCollector);
     }
 
     private void setupUnderlyingServiceRespondingSuccessfully() {
