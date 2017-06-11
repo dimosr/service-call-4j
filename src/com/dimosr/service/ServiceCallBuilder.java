@@ -1,6 +1,7 @@
 package com.dimosr.service;
 
 import com.dimosr.service.core.Cache;
+import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.UncheckedTimeoutException;
 
@@ -16,11 +17,13 @@ import java.util.function.BiConsumer;
  * A builder used to enhance a ServiceCall with additional capabilities.
  * Currently, the available capabilities are the following:
  * - caching
- * - monitoring (latency)
+ * - profiling (latency)
  * - retrying
  * - timeouts
  * - throttling
  * - circuit breaker
+ *
+ * If monitoring is enabled, all enabled capabilities will also emit the relevant metrics
  *
  * The capabilities are built on top of the provided ServiceCall.
  * The layering is such that there is no interference (or the least possible) between the various capabilities.
@@ -36,7 +39,7 @@ import java.util.function.BiConsumer;
  * -------------------------------------------------
  * |                 Caching                       |
  * -------------------------------------------------
- * |                Monitoring                     |
+ * |                Profiling                      |
  * -------------------------------------------------
  * |                 Retrying                      |
  * -------------------------------------------------
@@ -58,8 +61,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     private Cache<REQUEST, RESPONSE> cache;
 
-    private ExecutorService monitoringExecutor;
-    private BiConsumer<Instant, Duration> latencyConsumer;
+    private MetricsCollector metricsCollector = (namespace, value, timestamp) -> {};
 
     private RetryingPolicy retryingPolicy;
     private boolean retryTimeouts;
@@ -92,27 +94,14 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     }
 
     /**
-     * Enables monitoring capabilities
-     * @param latencyConsumer a lambda function, which will be called back with the latency of each call
+     * Enables monitoring capabilities.
+     * The provided metricsCollectors will be used to emit metrics around the operation of all the
+     * enabled capabilities
      *
-     * Note: the callback will be executed synchronously.
+     * @param metricsCollector a collector used by all capabilities to emit metrics for their operations
      */
-    public ServiceCallBuilder<REQUEST, RESPONSE> withMonitoring(final BiConsumer<Instant, Duration> latencyConsumer) {
-        this.latencyConsumer = latencyConsumer;
-        this.monitoringExecutor = null;
-        return this;
-    }
-
-    /**
-     * Enables monitoring capabilities
-     * @param latencyConsumer a lambda function, which will be called back with the latency of each call
-     * @param executorService the executor that will be used to execute the provided callbacks
-     *
-     * Note: the callback will be executed asynchronously, using the provided ExecutorService
-     */
-    public ServiceCallBuilder<REQUEST, RESPONSE> withMonitoring(final BiConsumer<Instant, Duration> latencyConsumer, final ExecutorService executorService) {
-        this.latencyConsumer = latencyConsumer;
-        this.monitoringExecutor = executorService;
+    public ServiceCallBuilder<REQUEST, RESPONSE> withMonitoring(final MetricsCollector metricsCollector) {
+        this.metricsCollector = metricsCollector;
         return this;
     }
 
@@ -219,13 +208,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     }
 
     private void wrapWithMonitoring() {
-        if(latencyConsumer != null) {
-            if(monitoringExecutor != null) {
-                enhancedServiceCall = new MonitoredServiceCall<>(enhancedServiceCall, Clock.systemUTC(), latencyConsumer, monitoringExecutor);
-            } else {
-                enhancedServiceCall = new MonitoredServiceCall<>(enhancedServiceCall, Clock.systemUTC(), latencyConsumer);
-            }
-        }
+        enhancedServiceCall = new ProfiledServiceCall<>(enhancedServiceCall, Clock.systemUTC(), metricsCollector);
     }
 
     private void wrapWithRetrying() {

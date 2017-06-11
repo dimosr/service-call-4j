@@ -1,43 +1,35 @@
 package com.dimosr.service;
 
+import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.ExecutorService;
-import java.util.function.BiConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
-public class MonitoredServiceCallTest {
+public class ProfiledServiceCallTest {
 
     @Mock
     private Clock mockClock;
     @Mock
     private ServiceCall<String, String> mockRootServiceCall;
     @Mock
-    private BiConsumer<Instant, Duration> latencyConsumer;
-    @Mock
-    private ExecutorService mockExecutor;
+    private MetricsCollector metricsCollector;
 
-    private ServiceCall<String, String> monitoredServiceCall;
-    private ServiceCall<String, String> monitoredServiceWithExecutor;
+    private ServiceCall<String, String> profiledServiceCall;
 
     private static final Instant BEFORE_CALL = Instant.ofEpochMilli(1000);
     private static final long CALL_LATENCY_IN_MILLISECONDS = 500;
@@ -45,8 +37,7 @@ public class MonitoredServiceCallTest {
 
     @Before
     public void setupMonitoredService() {
-        monitoredServiceCall = new MonitoredServiceCall<>(mockRootServiceCall, mockClock, latencyConsumer);
-        monitoredServiceWithExecutor = new MonitoredServiceCall<>(mockRootServiceCall, mockClock, latencyConsumer, mockExecutor);
+        profiledServiceCall = new ProfiledServiceCall<>(mockRootServiceCall, mockClock, metricsCollector);
 
         when(mockClock.instant())
                 .thenReturn(BEFORE_CALL)
@@ -55,27 +46,10 @@ public class MonitoredServiceCallTest {
 
     @Test
     public void whenMakingARequestLatencyIsCalculatedCorrectlyAndTriggersCallbackSync() {
-        monitoredServiceCall.call("irrelevant-request");
+        profiledServiceCall.call("irrelevant-request");
 
-        verify(latencyConsumer)
-                .accept(instantWithSameMilliseconds(BEFORE_CALL), durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
-    }
-
-    @Test
-    public void whenMakingARequestLatencyIsCalculatedCorrectlyAndTriggersCallbackASync() {
-        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
-
-        InOrder inOrder = inOrder(mockExecutor, latencyConsumer);
-
-        monitoredServiceWithExecutor.call("irrelevant-request");
-        inOrder.verify(mockExecutor)
-                .submit(runnableCaptor.capture());
-        verify(latencyConsumer, never())
-                .accept(any(Instant.class), any(Duration.class));
-
-        runnableCaptor.getValue().run();
-        inOrder.verify(latencyConsumer)
-                .accept(instantWithSameMilliseconds(BEFORE_CALL), durationWithValue(CALL_LATENCY_IN_MILLISECONDS));
+        verify(metricsCollector)
+                .putMetric(eq("ServiceCall.latency"), eq((double)CALL_LATENCY_IN_MILLISECONDS), instantWithSameMilliseconds(BEFORE_CALL));
     }
 
     @Test
@@ -86,7 +60,7 @@ public class MonitoredServiceCallTest {
         when(mockRootServiceCall.call(request))
                 .thenReturn(expectedResponse);
 
-        String actualResponse = monitoredServiceCall.call(request);
+        String actualResponse = profiledServiceCall.call(request);
 
         assertThat(actualResponse).isEqualTo(expectedResponse);
     }
