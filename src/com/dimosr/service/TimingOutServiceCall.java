@@ -6,6 +6,7 @@ import com.dimosr.service.exceptions.UncheckedTimeoutException;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -62,7 +63,7 @@ class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
             String message = String.format("Service call timed out after %d %s", timeout, accuracy);
             throw new UncheckedTimeoutException(message, e);
         } catch(ExecutionException e) {
-            throw new RuntimeException(e);
+            throw unwrapExecutionException(e);
         } catch(InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
@@ -84,5 +85,17 @@ class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
 
     private void emitMetric(final int numberOfTimeouts) {
         metricsCollector.putMetric(METRIC_TEMPLATE, numberOfTimeouts, clock.instant());
+    }
+
+    private RuntimeException unwrapExecutionException(final ExecutionException exception) {
+        return Optional.ofNullable(exception.getCause())
+                .map(causeException -> {
+                    if (causeException instanceof RuntimeException) {
+                        return (RuntimeException) causeException;
+                    } else {
+                        return new RuntimeException(exception.getMessage());
+                    }
+                })
+                .orElse(new RuntimeException(exception.getMessage()));
     }
 }

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,12 +86,43 @@ public class TimingOutServiceCallTest {
                 .putMetric(eq(METRIC_FOR_TIMEOUTS), eq(1.0d), any());
     }
 
-    @Test(expected = RuntimeException.class)
-    public void whenUnderlyingCallThrowsExceptionThenRuntimeExceptionIsThrown() throws InterruptedException, ExecutionException, TimeoutException {
+    @Test(expected = NullPointerException.class)
+    public void whenUnderlyingCallThrowsRuntimeExceptionThenOriginalExceptionThrown() throws InterruptedException, ExecutionException, TimeoutException {
+        ExecutionException exception = new ExecutionException("message", new NullPointerException());
         when(responseFuture.get(TIMEOUT.toMillis(), ACCURACY))
-                .thenThrow(ExecutionException.class);
+                .thenThrow(exception);
 
         timingOutServiceCall.call(REQUEST);
+    }
+
+    @Test
+    public void whenUnderlyingCallThrowsNonRuntimeExceptionThenRuntimeExceptionWithOriginalMessageThrown() throws InterruptedException, ExecutionException, TimeoutException {
+        ExecutionException exception = new ExecutionException("message", new Exception());
+        when(responseFuture.get(TIMEOUT.toMillis(), ACCURACY))
+                .thenThrow(exception);
+
+        try {
+            timingOutServiceCall.call(REQUEST);
+            fail("Expected exception was not thrown");
+        } catch(RuntimeException e) {
+            assertThat(e.getMessage()).isEqualTo("message");
+        }
+    }
+
+    @Test
+    public void whenExecutionExceptionWithoutCauseIsThrownThenRuntimeExceptionWithOriginalMessageThrown() throws InterruptedException, ExecutionException, TimeoutException {
+        ExecutionException exception = mock(ExecutionException.class);
+        when(exception.getMessage()).thenReturn("message");
+        when(exception.getCause()).thenReturn(null);
+        when(responseFuture.get(TIMEOUT.toMillis(), ACCURACY))
+                .thenThrow(exception);
+
+        try {
+            timingOutServiceCall.call(REQUEST);
+            fail("Expected exception was not thrown");
+        } catch(RuntimeException e) {
+            assertThat(e.getMessage()).isEqualTo("message");
+        }
     }
 
     @Test
