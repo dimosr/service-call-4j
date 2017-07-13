@@ -26,9 +26,11 @@ import static org.mockito.Mockito.when;
 public class CircuitBreakingServiceCallTest {
 
     @Mock
-    private Clock clock;
-    @Mock
     private ServiceCall<String, String> rootServiceCall;
+    private String serviceCallID = "service-id";
+
+    @Mock
+    private Clock clock;
     @Mock
     private MetricsCollector metricsCollector;
 
@@ -46,13 +48,14 @@ public class CircuitBreakingServiceCallTest {
 
     private long clockTime = 0;
 
-    private static final String METRIC_FOR_CLOSED = "ServiceCall.CircuitBreaker.state.CLOSED";
-    private static final String METRIC_FOR_HALF_OPEN = "ServiceCall.CircuitBreaker.state.HALF_OPEN";
-    private static final String METRIC_FOR_OPEN = "ServiceCall.CircuitBreaker.state.OPEN";
+    private static final String METRIC_FOR_CLOSED = "ServiceCall.service-id.CircuitBreaker.state.CLOSED";
+    private static final String METRIC_FOR_HALF_OPEN = "ServiceCall.service-id.CircuitBreaker.state.HALF_OPEN";
+    private static final String METRIC_FOR_OPEN = "ServiceCall.service-id.CircuitBreaker.state.OPEN";
 
     @Before
     public void setup() {
         serviceCall = new CircuitBreakingServiceCall<>(rootServiceCall,
+                                                       serviceCallID,
                                                        REQUESTS_WINDOW,
                                                        FAILURES_OPEN_THRESHOLD,
                                                        SUCCESSES_CLOSE_THRESHOLD,

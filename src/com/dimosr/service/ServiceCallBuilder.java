@@ -58,6 +58,7 @@ import java.util.function.BiConsumer;
  */
 public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private ServiceCall<REQUEST, RESPONSE> enhancedServiceCall;
+    private String serviceCallID;
 
     private Cache<REQUEST, RESPONSE> cache;
 
@@ -81,8 +82,14 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private int consecutiveSuccessfulRequests;
     private long durationOfOpenState;
 
-    public ServiceCallBuilder(final ServiceCall<REQUEST, RESPONSE> serviceCall) {
+    /**
+     * @param serviceCall the serviceCall that will be wrapped with additional functionalities
+     * @param serviceCallID the ID that will be used for identifying logs/metrics emitted by the library
+     */
+    public ServiceCallBuilder(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                              final String serviceCallID) {
         this.enhancedServiceCall = serviceCall;
+        this.serviceCallID = serviceCallID;
     }
 
     /**
@@ -209,34 +216,34 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     }
 
     private void wrapWithMonitoring() {
-        enhancedServiceCall = new ProfiledServiceCall<>(enhancedServiceCall, Clock.systemUTC(), metricsCollector);
+        enhancedServiceCall = new ProfiledServiceCall<>(enhancedServiceCall, serviceCallID, Clock.systemUTC(), metricsCollector);
     }
 
     private void wrapWithRetrying() {
         if(retryingPolicy != null) {
             if(retryTimeouts) {
-                enhancedServiceCall = new RetryableServiceCall<>(enhancedServiceCall, retryingPolicy, maxRetries, Thread::sleep, Collections.singletonList(UncheckedTimeoutException.class), metricsCollector, Clock.systemUTC());
+                enhancedServiceCall = new RetryableServiceCall<>(enhancedServiceCall, serviceCallID, retryingPolicy, maxRetries, Thread::sleep, Collections.singletonList(UncheckedTimeoutException.class), metricsCollector, Clock.systemUTC());
             } else {
-                enhancedServiceCall = new RetryableServiceCall<>(enhancedServiceCall, retryingPolicy, maxRetries, Thread::sleep, metricsCollector, Clock.systemUTC());
+                enhancedServiceCall = new RetryableServiceCall<>(enhancedServiceCall, serviceCallID, retryingPolicy, maxRetries, Thread::sleep, metricsCollector, Clock.systemUTC());
             }
         }
     }
 
     private void wrapWithTimeouts() {
         if(timeoutExecutor != null) {
-            enhancedServiceCall = new TimingOutServiceCall<>(enhancedServiceCall, timeout, accuracy, timeoutExecutor, Clock.systemUTC(), metricsCollector);
+            enhancedServiceCall = new TimingOutServiceCall<>(enhancedServiceCall, serviceCallID, timeout, accuracy, timeoutExecutor, Clock.systemUTC(), metricsCollector);
         }
     }
 
     private void wrapWithThrottling() {
         if(isThrottlingEnabled) {
-            enhancedServiceCall = new ThrottlingServiceCall<>(enhancedServiceCall, maxRequestsPerSecond, Clock.systemUTC(), metricsCollector);
+            enhancedServiceCall = new ThrottlingServiceCall<>(enhancedServiceCall, serviceCallID, maxRequestsPerSecond, Clock.systemUTC(), metricsCollector);
         }
     }
 
     private void wrapWithCircuitBreaker() {
         if(isCircuitBreakerEnabled) {
-            enhancedServiceCall = new CircuitBreakingServiceCall<>(enhancedServiceCall, monitoredRequestsWindow, minimumFailingRequests, consecutiveSuccessfulRequests, durationOfOpenState, Clock.systemUTC(), metricsCollector);
+            enhancedServiceCall = new CircuitBreakingServiceCall<>(enhancedServiceCall, serviceCallID, monitoredRequestsWindow, minimumFailingRequests, consecutiveSuccessfulRequests, durationOfOpenState, Clock.systemUTC(), metricsCollector);
         }
     }
 }

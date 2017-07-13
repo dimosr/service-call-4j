@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 public class RetryableServiceCallTest {
 
     private RetryableServiceCall<String, String> retryableServiceCall;
+    private String serviceCallID = "service-id";
 
     @Mock
     private ServiceCall<String, String> underlyingMockServiceCall;
@@ -41,7 +42,7 @@ public class RetryableServiceCallTest {
     @Mock
     private Clock clock;
 
-    private static final String METRIC_FOR_RETRIES = "ServiceCall.Retries";
+    private static final String METRIC_FOR_RETRIES = "ServiceCall.service-id.Retries";
 
     private static class CustomException extends RuntimeException{}
 
@@ -58,6 +59,7 @@ public class RetryableServiceCallTest {
 
         retryableServiceCall = new RetryableServiceCall<>(
                 underlyingMockServiceCall,
+                serviceCallID,
                 retryingPolicy,
                 RETRIES,
                 mockSleeper,

@@ -15,13 +15,14 @@ import java.util.concurrent.TimeoutException;
 
 class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
+    private final String serviceCallID;
     private final long timeout;
     private final TimeUnit accuracy;
     private final ExecutorService executorService;
     private final Clock clock;
     private final MetricsCollector metricsCollector;
 
-    private static final String METRIC_TEMPLATE = "ServiceCall.Timeouts";
+    private static final String METRIC_TEMPLATE = "ServiceCall.%s.Timeouts";
 
     /**
      * A ServiceCall that will timeout after the provided time has passed
@@ -30,19 +31,22 @@ class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * Note: TimeUnit.NANOSECONDS accuracy not supported, due to Java API deficiencies in conversion
      *
      * @param serviceCall the ServiceCall that will be executed
+     * @param serviceCallID the ID under which the metric will be emitted
      * @param timeout the timeout imposed on the call
      * @param accuracy the accuracy that will be used for the provided timeout (e.g. milliseconds, microseconds etc.)
      * @param executorService the executorService that will be used for executing the ServiceCall
      * @param clock the clock used to measure the timestamps for the emitted metrics
      * @param metricsCollector the collector used to emit metrics for the number of timeouts
      */
-    public TimingOutServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
-                                final Duration timeout,
-                                final TimeUnit accuracy,
-                                final ExecutorService executorService,
-                                final Clock clock,
-                                final MetricsCollector metricsCollector) {
+    TimingOutServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                         final String serviceCallID,
+                         final Duration timeout,
+                         final TimeUnit accuracy,
+                         final ExecutorService executorService,
+                         final Clock clock,
+                         final MetricsCollector metricsCollector) {
         this.serviceCall = serviceCall;
+        this.serviceCallID = serviceCallID;
         this.timeout = getValueRelativeToUnit(timeout, accuracy);
         this.accuracy = accuracy;
         this.executorService = executorService;
@@ -84,7 +88,8 @@ class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
     }
 
     private void emitMetric(final int numberOfTimeouts) {
-        metricsCollector.putMetric(METRIC_TEMPLATE, numberOfTimeouts, clock.instant());
+        final String metricName = String.format(METRIC_TEMPLATE, serviceCallID);
+        metricsCollector.putMetric(metricName, numberOfTimeouts, clock.instant());
     }
 
     private RuntimeException unwrapExecutionException(final ExecutionException exception) {

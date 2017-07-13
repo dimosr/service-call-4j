@@ -27,6 +27,8 @@ public class ServiceCallBuilderTest {
 
     @Mock
     private ServiceCall<String, String> originalServiceCall;
+    private String serviceCallId = "service-id";
+
     @Mock
     private Cache<String, String> cache;
     @Mock
@@ -47,7 +49,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildPlainService() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                                                                 .build();
 
         verifyLayersAreInCorrectOrder(enhancedServiceCall, ProfiledServiceCall.class);
@@ -55,7 +57,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildServiceWithThrottling() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withThrottling(MAX_REQUESTS_PER_SECOND)
                 .build();
 
@@ -67,7 +69,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildServiceWithThrottlingAndTimeouts() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
                 .withThrottling(MAX_REQUESTS_PER_SECOND)
                 .build();
@@ -81,7 +83,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildServiceWithThrottlingTimeoutsAndRetrying() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
                 .withThrottling(MAX_REQUESTS_PER_SECOND)
                 .withRetrying(false, MAX_RETRIES)
@@ -97,7 +99,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildServiceWithThrottlingRetryableTimeoutsAndRetrying() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
                 .withThrottling(MAX_REQUESTS_PER_SECOND)
                 .withRetrying(true, MAX_RETRIES)
@@ -113,7 +115,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildServiceWithThrottlingTimeoutsRetryingAndMonitoring() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withMonitoring(metricsCollector)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
                 .withThrottling(MAX_REQUESTS_PER_SECOND)
@@ -130,7 +132,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildServiceWithThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withCache(cache)
                 .withMonitoring(metricsCollector)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
@@ -149,7 +151,7 @@ public class ServiceCallBuilderTest {
 
     @Test
     public void buildServiceWithCircuitBreakerThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
-        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall)
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withCircuitBreaker(CIRCUIT_BREAKER_MONITORING_WINDOW, MIN_FAILING_REQUESTS, CONSECUTIVE_SUCCESSFUL_REQUESTS, OPEN_CIRCUIT_DURATION)
                 .withCache(cache)
                 .withMonitoring(metricsCollector)

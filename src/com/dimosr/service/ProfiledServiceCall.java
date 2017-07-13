@@ -17,23 +17,27 @@ import java.util.function.BiConsumer;
  */
 class ProfiledServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
+    private final String serviceCallID;
     private final Clock clock;
     private MetricsCollector metricsCollector;
 
-    private static final String METRIC_TEMPLATE = "ServiceCall.latency";
+    private static final String METRIC_TEMPLATE = "ServiceCall.%s.latency";
 
     /**
      * Constructs a profiled serviceCall, that will call the underlying serviceCall and emit metrics around latency
      * using the provided metricsCollector
      *
      * @param serviceCall the underlying serviceCall that will be called
+     * @param serviceCallID the ID under which the metric will be emitted
      * @param clock the clock used to measure latency
      * @param metricsCollector the collector used to emit the metrics
      */
     ProfiledServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                        final String serviceCallID,
                         final Clock clock,
                         final MetricsCollector metricsCollector) {
         this.serviceCall = serviceCall;
+        this.serviceCallID = serviceCallID;
         this.clock = clock;
         this.metricsCollector = metricsCollector;
     }
@@ -51,6 +55,7 @@ class ProfiledServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RES
     }
 
     private void emitLatencyMetric(final Instant timestamp, final Duration callDuration) {
-        metricsCollector.putMetric(METRIC_TEMPLATE, callDuration.toMillis(), timestamp);
+        final String metricName = String.format(METRIC_TEMPLATE, serviceCallID);
+        metricsCollector.putMetric(metricName, callDuration.toMillis(), timestamp);
     }
 }

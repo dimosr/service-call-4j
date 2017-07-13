@@ -9,16 +9,19 @@ import java.time.Clock;
 
 class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
+    private final String serviceCallID;
+
     private final CircuitBreaker circuitBreaker;
 
     private final MetricsCollector metricsCollector;
     private final Clock clock;
 
-    private static final String METRIC_TEMPLATE = "ServiceCall.CircuitBreaker.state.%s";
+    private static final String METRIC_TEMPLATE = "ServiceCall.%s.CircuitBreaker.state.%s";
 
     /**
      * Returns a ServiceCall with circuit-breaking capabiliies
      * @param serviceCall, the service whose calls will be wrapped with the circuit breaker
+     * @param serviceCallID the ID under which the metric will be emitted
      * @param requestsWindow, the number of the last requests that will be considered for failures
      * @param failingRequestsToOpen, the number of failed requests in the last "requestsWindow" requests,
      *                               after which the circuit breaker will be opened
@@ -28,6 +31,7 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
      * @param clock, the clock that will be used to measure the intervals
      */
     CircuitBreakingServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                               final String serviceCallID,
                                final int requestsWindow,
                                final int failingRequestsToOpen,
                                final int consecutiveSuccessfulRequestsToClose,
@@ -35,6 +39,7 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
                                final Clock clock,
                                final MetricsCollector metricsCollector) {
         this.serviceCall = serviceCall;
+        this.serviceCallID = serviceCallID;
         this.circuitBreaker = new CircuitBreaker(requestsWindow, failingRequestsToOpen, consecutiveSuccessfulRequestsToClose, durationOfOpenInMilliseconds, clock);
         this.metricsCollector = metricsCollector;
         this.clock = clock;
@@ -59,8 +64,8 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
     }
 
     private void emitMetrics(final CircuitBreaker.CircuitBreakerState state) {
-        final String metricNamespace = String.format(METRIC_TEMPLATE, state);
-        metricsCollector.putMetric(metricNamespace, 1, clock.instant());
+        final String metricName = String.format(METRIC_TEMPLATE, serviceCallID, state);
+        metricsCollector.putMetric(metricName, 1, clock.instant());
     }
 
     private static class CircuitBreaker {

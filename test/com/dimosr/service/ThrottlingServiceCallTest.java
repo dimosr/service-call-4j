@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 @RunWith(MockitoJUnitRunner.class)
 public class ThrottlingServiceCallTest {
 
-    private static final String METRIC_FOR_THROTTLING = "ServiceCall.Throttling";
+    private static final String METRIC_FOR_THROTTLING = "ServiceCall.service-id.Throttling";
 
     private static final int MAX_REQUESTS_PER_SECOND = 5;
 
@@ -36,6 +36,8 @@ public class ThrottlingServiceCallTest {
 
     @Mock
     private ServiceCall<String, String> serviceCall;
+    private String serviceCallID = "service-id";
+
     @Mock
     private Clock clock;
 
@@ -46,7 +48,7 @@ public class ThrottlingServiceCallTest {
 
     @Before
     public void setupThrottlingServiceCall() {
-        throttlingServiceCall = new ThrottlingServiceCall<>(serviceCall, MAX_REQUESTS_PER_SECOND, clock, metricsCollector);
+        throttlingServiceCall = new ThrottlingServiceCall<>(serviceCall, serviceCallID, MAX_REQUESTS_PER_SECOND, clock, metricsCollector);
 
         setupServiceCall();
         setupClockToReturnSameSecond();

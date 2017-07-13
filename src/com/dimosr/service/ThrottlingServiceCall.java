@@ -11,6 +11,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
+    private String serviceCallID;
     private final long maxRequestsPerSecond;
     private final Clock clock;
 
@@ -25,13 +26,15 @@ class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, R
 
     private static final long SECOND_IN_MILLISECONDS = 1000;
 
-    private static final String METRIC_TEMPLATE = "ServiceCall.Throttling";
+    private static final String METRIC_TEMPLATE = "ServiceCall.%s.Throttling";
 
-    public ThrottlingServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
-                                 final long maxRequestsPerSecond,
-                                 final Clock clock,
-                                 final MetricsCollector metricsCollector) {
+    ThrottlingServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                          final String serviceCallID,
+                          final long maxRequestsPerSecond,
+                          final Clock clock,
+                          final MetricsCollector metricsCollector) {
         this.serviceCall = serviceCall;
+        this.serviceCallID = serviceCallID;
         this.maxRequestsPerSecond = maxRequestsPerSecond;
         this.clock = clock;
         requestsCounter = new AtomicLong(0);
@@ -111,6 +114,7 @@ class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, R
     }
 
     private void emitMetric(final int throttledRequests) {
-        metricsCollector.putMetric(METRIC_TEMPLATE, throttledRequests, clock.instant());
+        final String metricName = String.format(METRIC_TEMPLATE, serviceCallID);
+        metricsCollector.putMetric(metricName, throttledRequests, clock.instant());
     }
 }

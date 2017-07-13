@@ -30,6 +30,7 @@ public class ProfiledServiceCallTest {
     private MetricsCollector metricsCollector;
 
     private ServiceCall<String, String> profiledServiceCall;
+    private String serviceCallId = "service-id";
 
     private static final Instant BEFORE_CALL = Instant.ofEpochMilli(1000);
     private static final long CALL_LATENCY_IN_MILLISECONDS = 500;
@@ -37,7 +38,7 @@ public class ProfiledServiceCallTest {
 
     @Before
     public void setupMonitoredService() {
-        profiledServiceCall = new ProfiledServiceCall<>(mockRootServiceCall, mockClock, metricsCollector);
+        profiledServiceCall = new ProfiledServiceCall<>(mockRootServiceCall, serviceCallId, mockClock, metricsCollector);
 
         when(mockClock.instant())
                 .thenReturn(BEFORE_CALL)
@@ -49,7 +50,7 @@ public class ProfiledServiceCallTest {
         profiledServiceCall.call("irrelevant-request");
 
         verify(metricsCollector)
-                .putMetric(eq("ServiceCall.latency"), eq((double)CALL_LATENCY_IN_MILLISECONDS), instantWithSameMilliseconds(BEFORE_CALL));
+                .putMetric(eq("ServiceCall.service-id.latency"), eq((double)CALL_LATENCY_IN_MILLISECONDS), instantWithSameMilliseconds(BEFORE_CALL));
     }
 
     @Test

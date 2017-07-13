@@ -17,6 +17,8 @@ import java.util.List;
  */
 class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
+    private final String serviceCallID;
+
     private final RetryingPolicy retryingPolicy;
     private final int maxRetries;
 
@@ -27,12 +29,13 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
 
     private final List<Class> retryableExceptions = Lists.newArrayList(RetryableException.class);
 
-    private final static String METRIC_TEMPLATE = "ServiceCall.Retries";
+    private final static String METRIC_TEMPLATE = "ServiceCall.%s.Retries";
 
     /**
      * A ServiceCall that will be retried, when the underlying serviceCall throws a RetryableException
      *
      * @param serviceCall the underlying serviceCall that will be called
+     * @param serviceCallID the ID under which the metric will be emitted
      * @param retryingPolicy the policy defining what the backoff of each retry will be
      * @param maxRetries the number of maximum retries
      * @param sleeper a component providing the utility of postponing the execution of the current thread for some period
@@ -40,12 +43,14 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * @param clock the clock used to record the timestamps of the metrics
      */
     public RetryableServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                                final String serviceCallID,
                                 final RetryingPolicy retryingPolicy,
                                 final int maxRetries,
                                 final Sleeper sleeper,
                                 final MetricsCollector metricsCollector,
                                 final Clock clock) {
         this.serviceCall = serviceCall;
+        this.serviceCallID = serviceCallID;
         this.retryingPolicy = retryingPolicy;
         this.maxRetries = maxRetries;
         this.sleeper = sleeper;
@@ -58,6 +63,7 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * or one of the exceptions provided in the constructor
      *
      * @param serviceCall, the underlying serviceCall that will be called
+     * @param serviceCallID the ID under which the metric will be emitted
      * @param retryingPolicy, the policy defining what the backoff of each retry will be
      * @param retryableExceptions, the list of exceptions that will be retried
      * @param sleeper, a component providing the utility of postponing the execution of the current thread for some period
@@ -66,13 +72,14 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
      * @param clock the clock used to record the timestamps of the metrics
      */
     public RetryableServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                                final String serviceCallID,
                                 final RetryingPolicy retryingPolicy,
                                 final int maxRetries,
                                 final Sleeper sleeper,
                                 final List<Class<? extends Throwable>> retryableExceptions,
                                 final MetricsCollector metricsCollector,
                                 final Clock clock) {
-        this(serviceCall, retryingPolicy, maxRetries, sleeper, metricsCollector, clock);
+        this(serviceCall, serviceCallID, retryingPolicy, maxRetries, sleeper, metricsCollector, clock);
         this.retryableExceptions.addAll(retryableExceptions);
     }
 
@@ -114,6 +121,7 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
     }
 
     private void emitMetrics(final int numberOfRetries) {
-        metricsCollector.putMetric(METRIC_TEMPLATE, numberOfRetries, clock.instant());
+        final String metricName = String.format(METRIC_TEMPLATE, serviceCallID);
+        metricsCollector.putMetric(metricName, numberOfRetries, clock.instant());
     }
 }

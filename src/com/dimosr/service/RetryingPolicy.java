@@ -5,7 +5,6 @@ import java.time.Duration;
 
 class RetryingPolicy {
 
-
     private final Duration backoffInterval;
 
     private final BackoffPolicy backoffPolicy;
