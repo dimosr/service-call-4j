@@ -12,6 +12,7 @@ import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,6 +43,7 @@ public class ServiceCallBuilderTest {
 
     private final static long MAX_REQUESTS_PER_SECOND = 100;
 
+    private final Function<String, String> responseSupplier = input -> "dummy-output";
     private final int CIRCUIT_BREAKER_MONITORING_WINDOW = 25;
     private final int MIN_FAILING_REQUESTS = 10;
     private final int CONSECUTIVE_SUCCESSFUL_REQUESTS = 5;
@@ -150,9 +152,30 @@ public class ServiceCallBuilderTest {
     }
 
     @Test
-    public void buildServiceWithCircuitBreakerThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
+    public void buildServiceWithCircuitBreakerWithoutSupplierThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
         ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withCircuitBreaker(CIRCUIT_BREAKER_MONITORING_WINDOW, MIN_FAILING_REQUESTS, CONSECUTIVE_SUCCESSFUL_REQUESTS, OPEN_CIRCUIT_DURATION)
+                .withCache(cache)
+                .withMonitoring(metricsCollector)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .withRetrying(false, MAX_RETRIES)
+                .build();
+
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                CachedServiceCall.class,
+                ProfiledServiceCall.class,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class,
+                CircuitBreakingServiceCall.class
+        );
+    }
+
+    @Test
+    public void buildServiceWithCircuitBreakerWithSupplierThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
+                .withCircuitBreaker(responseSupplier, CIRCUIT_BREAKER_MONITORING_WINDOW, MIN_FAILING_REQUESTS, CONSECUTIVE_SUCCESSFUL_REQUESTS, OPEN_CIRCUIT_DURATION)
                 .withCache(cache)
                 .withMonitoring(metricsCollector)
                 .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)

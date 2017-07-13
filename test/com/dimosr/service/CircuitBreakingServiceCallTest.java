@@ -13,8 +13,10 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.stubbing.Answer;
 
 import java.time.Clock;
+import java.util.function.Function;
 
 import static junit.framework.TestCase.fail;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -52,18 +54,37 @@ public class CircuitBreakingServiceCallTest {
     private static final String METRIC_FOR_HALF_OPEN = "ServiceCall.service-id.CircuitBreaker.state.HALF_OPEN";
     private static final String METRIC_FOR_OPEN = "ServiceCall.service-id.CircuitBreaker.state.OPEN";
 
+    private static final String CONTANT_RESPONSE = "constant-output";
+    Function<String, String> responseSupplier = input -> CONTANT_RESPONSE;
+
     @Before
     public void setup() {
-        serviceCall = new CircuitBreakingServiceCall<>(rootServiceCall,
-                                                       serviceCallID,
-                                                       REQUESTS_WINDOW,
-                                                       FAILURES_OPEN_THRESHOLD,
-                                                       SUCCESSES_CLOSE_THRESHOLD,
-                                                       HALF_OPEN_DURATION_MILLISECONDS,
-                                                       clock,
-                                                       metricsCollector);
+        setupCircuitBreakingServiceCallWithoutSupplier();
         setupRootService();
         setupClock();
+    }
+
+    private void setupCircuitBreakingServiceCallWithoutSupplier() {
+        serviceCall = new CircuitBreakingServiceCall<>(rootServiceCall,
+                serviceCallID,
+                REQUESTS_WINDOW,
+                FAILURES_OPEN_THRESHOLD,
+                SUCCESSES_CLOSE_THRESHOLD,
+                HALF_OPEN_DURATION_MILLISECONDS,
+                clock,
+                metricsCollector);
+    }
+
+    private void setupCircuitBreakingServiceCallWithSupplier(final Function<String, String> responseSupplier) {
+        serviceCall = new CircuitBreakingServiceCall<>(rootServiceCall,
+                responseSupplier,
+                serviceCallID,
+                REQUESTS_WINDOW,
+                FAILURES_OPEN_THRESHOLD,
+                SUCCESSES_CLOSE_THRESHOLD,
+                HALF_OPEN_DURATION_MILLISECONDS,
+                clock,
+                metricsCollector);
     }
 
     private void setupRootService() {
@@ -96,7 +117,7 @@ public class CircuitBreakingServiceCallTest {
     }
 
     @Test
-    public void whenMoreRequestsThanThresholdAreFailingInsideWindowCircuitBreakerOpens() {
+    public void whenMoreRequestsThanThresholdAreFailingInsideWindowCircuitBreakerOpens_AndThrowsExceptionIfNoSupplierProvider() {
         createFailingRequests(FAILURES_OPEN_THRESHOLD);
 
         try {
@@ -104,6 +125,21 @@ public class CircuitBreakingServiceCallTest {
         } catch (OpenCircuitBreakerException e) {
             /* Nothing to do - verified that exception was thrown */
         }
+        verify(metricsCollector, times(FAILURES_OPEN_THRESHOLD))
+                .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
+        verify(metricsCollector)
+                .putMetric(eq(METRIC_FOR_OPEN), eq((double)1), any());
+    }
+
+    @Test
+    public void whenMoreRequestsThanThresholdAreFailingInsideWindowCircuitBreakerOpens_AndReturnsSupplierValueWhenProvided() {
+        setupCircuitBreakingServiceCallWithSupplier(responseSupplier);
+
+        createFailingRequests(FAILURES_OPEN_THRESHOLD);
+
+        String response = serviceCall.call(VALID_REQUEST);
+        assertThat(response).isEqualTo(CONTANT_RESPONSE);
+
         verify(metricsCollector, times(FAILURES_OPEN_THRESHOLD))
                 .putMetric(eq(METRIC_FOR_CLOSED), eq((double)1), any());
         verify(metricsCollector)

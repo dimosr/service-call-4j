@@ -6,12 +6,15 @@ import com.dimosr.service.exceptions.OpenCircuitBreakerException;
 import com.dimosr.service.util.StatisticsQueue;
 
 import java.time.Clock;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
     private final String serviceCallID;
 
     private final CircuitBreaker circuitBreaker;
+    private Function<REQUEST, RESPONSE> responseSupplier;
 
     private final MetricsCollector metricsCollector;
     private final Clock clock;
@@ -19,7 +22,9 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
     private static final String METRIC_TEMPLATE = "ServiceCall.%s.CircuitBreaker.state.%s";
 
     /**
-     * Returns a ServiceCall with circuit-breaking capabiliies
+     * Returns a ServiceCall with circuit-breaking capabilities, where an OpenCircuitBreakerException will be thrown
+     * while the circuit breaker is open.
+     *
      * @param serviceCall, the service whose calls will be wrapped with the circuit breaker
      * @param serviceCallID the ID under which the metric will be emitted
      * @param requestsWindow, the number of the last requests that will be considered for failures
@@ -45,12 +50,33 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
         this.clock = clock;
     }
 
+    /**
+     * Returns a ServiceCall with circuit-breaking capabilities, where the value provided by the given
+     * supplier is returned while the circuit breaker is open
+     */
+    CircuitBreakingServiceCall(final ServiceCall<REQUEST, RESPONSE> serviceCall,
+                               final Function<REQUEST, RESPONSE> responseSupplier,
+                               final String serviceCallID,
+                               final int requestsWindow,
+                               final int failingRequestsToOpen,
+                               final int consecutiveSuccessfulRequestsToClose,
+                               final long durationOfOpenInMilliseconds,
+                               final Clock clock,
+                               final MetricsCollector metricsCollector) {
+        this(serviceCall, serviceCallID, requestsWindow, failingRequestsToOpen, consecutiveSuccessfulRequestsToClose, durationOfOpenInMilliseconds, clock, metricsCollector);
+        this.responseSupplier = responseSupplier;
+    }
+
     @Override
     public RESPONSE call(REQUEST request) {
         CircuitBreaker.CircuitBreakerState currentState = circuitBreaker.getState();
         emitMetrics(currentState);
         if(currentState == CircuitBreaker.CircuitBreakerState.OPEN) {
-            throw new OpenCircuitBreakerException("Circuit breaker is opened, request to underlying service was not made.");
+            if(responseSupplier == null) {
+                throw new OpenCircuitBreakerException("Circuit breaker is opened, request to underlying service was not made.");
+            } else {
+                return responseSupplier.apply(request);
+            }
         }
 
         try {

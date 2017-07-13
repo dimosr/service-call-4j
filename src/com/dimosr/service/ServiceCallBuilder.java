@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /**
  * A builder used to enhance a ServiceCall with additional capabilities.
@@ -77,6 +78,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     private long maxRequestsPerSecond;
 
     private boolean isCircuitBreakerEnabled = false;
+    private Function<REQUEST, RESPONSE> responseSupplier;
     private int monitoredRequestsWindow;
     private int minimumFailingRequests;
     private int consecutiveSuccessfulRequests;
@@ -173,13 +175,16 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      *   The latest {@code monitoredRequestsWindow} requests are being monitored and if at least
      *   {@code minimumFailingRequests} of them have failed, then the circuit breaker transitions
      *   to OPEN state
-     * - When in OPEN state, the circuit breaker fails all requests with a {@code OpenCircuitBreakerException}
-     *   without calling the underlying Service at all. The circuit breaker remains in OPEN state
-     *   for {@code durationOfOpenState} milliseconds and then transitions to HALF_OPEN state
+     * - When in OPEN state, the circuit breaker does not call the underlying Service at all and:
+     *      - if no responseSupplier is provided, fails all requests with a {@code OpenCircuitBreakerException}
+     *      - if a responseSupplier is provided, returns the value provided by it
+     *   The circuit breaker remains in OPEN state for {@code durationOfOpenState} milliseconds
+     *   and then transitions to HALF_OPEN state
      * - When in HALF_OPEN state, the circuit breaker starts forwarding the requests to the
      *   underlying Service again. If the first {@code consecutiveSuccessfulRequests} are all
      *   successful, then the circuit breaker transitions to CLOSED state. Otherwise, the circuit
      *   breaker transitions to OPEN state.
+     *
      * @param monitoredRequestsWindow the number of the latest requests that are being monitored when in CLOSED state
      * @param minimumFailingRequests the number of requests, after which the circuit breaker transitions from CLOSED to OPEN state
      * @param consecutiveSuccessfulRequests the number of successful requests, after which the circuit breaker transitions from HALF_OPEN to CLOSED state
@@ -195,6 +200,16 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
         this.minimumFailingRequests = minimumFailingRequests;
         this.consecutiveSuccessfulRequests = consecutiveSuccessfulRequests;
         this.durationOfOpenState = durationOfOpenState;
+        return this;
+    }
+
+    public ServiceCallBuilder<REQUEST, RESPONSE> withCircuitBreaker(final Function<REQUEST, RESPONSE> responseSupplier,
+                                                                    final int monitoredRequestsWindow,
+                                                                    final int minimumFailingRequests,
+                                                                    final int consecutiveSuccessfulRequests,
+                                                                    final long durationOfOpenState) {
+        withCircuitBreaker(monitoredRequestsWindow, minimumFailingRequests, consecutiveSuccessfulRequests, durationOfOpenState);
+        this.responseSupplier = responseSupplier;
         return this;
     }
 
