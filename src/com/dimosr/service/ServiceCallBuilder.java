@@ -17,12 +17,14 @@ import java.util.function.Function;
 /**
  * A builder used to enhance a ServiceCall with additional capabilities.
  * Currently, the available capabilities are the following:
- * - caching
- * - profiling (latency)
- * - retrying
- * - timeouts
- * - throttling
- * - circuit breaker
+ * <ul>
+ *     <li>caching
+ *     <li>profiling
+ *     <li>retrying
+ *     <li>timeouts
+ *     <li>throttling
+ *     <li>circuit breaker
+ * </ul>
  *
  * If monitoring is enabled, all enabled capabilities will also emit the relevant metrics
  *
@@ -30,9 +32,11 @@ import java.util.function.Function;
  * The layering is such that there is no interference (or the least possible) between the various capabilities.
  *
  * For instance, below is the reasoning behind some of the decisions around layering:
- * - Caching is above monitoring, so that only actual calls to the service are monitored
- * - Monitoring is above retrying & timeouts, so that latency measured is for the total duration of the call (including any retries)
- * - Retrying is above timeouts, so that retrying can be configured to retry on timeouts (UncheckedTimeoutExceptions)
+ * <ul>
+ *     <li>Caching is above monitoring, so that only actual calls to the service are monitored
+ *     <li>Monitoring is above retrying and timeouts, so that latency measured is for the total duration of the call (including any retries)
+ *     <li>Retrying is above timeouts, so that retrying can be configured to retry on timeouts (UncheckedTimeoutExceptions)
+ * </ul>
  *
  *
  * The layering on top of the ServiceCall is the following:
@@ -97,6 +101,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
     /**
      * Enables caching, so that responses from the underlying service will be cached
      * @param cache the cache that will be used to cache responses of the services
+     *
+     * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withCache(Cache<REQUEST, RESPONSE> cache) {
         this.cache = cache;
@@ -109,6 +115,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      * enabled capabilities
      *
      * @param metricsCollector a collector used by all capabilities to emit metrics for their operations
+     *
+     * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withMonitoring(final MetricsCollector metricsCollector) {
         this.metricsCollector = metricsCollector;
@@ -121,6 +129,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      * @param backoff the backoff period
      * @param retryTimeouts if timeouts will be retried
      * @param maxRetries the maximum number of retries that will be performed, before failing the request
+     *
+     * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withRetrying(final BackoffPolicy backoffPolicy, final Duration backoff, final boolean retryTimeouts, final int maxRetries) {
         this.retryingPolicy = new RetryingPolicy(backoffPolicy, backoff);
@@ -133,6 +143,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      * Enables retries, where retries will be performed directly without waiting-backoff period
      * @param retryTimeouts if timeouts will be retried
      * @param maxRetries the maximum number of retries that will be performed, before failing the request
+     *
+     * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withRetrying(final boolean retryTimeouts, final int maxRetries) {
         withRetrying(BackoffPolicy.ZERO_BACKOFF, Duration.ZERO, retryTimeouts, maxRetries);
@@ -147,6 +159,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      *
      * Attention: Timeout functionality makes use of future and multiple threads, thus is based on the assumption that the executor is multi-threaded
      *            So, if you provide a single-thread executor, note that the timeout functionality will not be enabled
+     *
+     * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withTimeouts(final Duration timeout, final TimeUnit accuracy, final ExecutorService executor) {
         this.timeout = timeout;
@@ -161,6 +175,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      *
      * Note: the throttling functionality is thread-safe, so the serviceCall can be called by multiple threads
      *       and the throttling limit will be applied globally, based on the sum of calls of all the threads
+     *
+     * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withThrottling(final long maxRequestsPerSecond) {
         this.isThrottlingEnabled = true;
@@ -190,6 +206,8 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      * @param consecutiveSuccessfulRequests the number of successful requests, after which the circuit breaker transitions from HALF_OPEN to CLOSED state
      * @param durationOfOpenState the duration of the interval, for which the circuit breaker remains in OPEN state, before
      *                            transitioning to HALF_OPEN state
+     *
+     * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withCircuitBreaker(final int monitoredRequestsWindow,
                                                                     final int minimumFailingRequests,

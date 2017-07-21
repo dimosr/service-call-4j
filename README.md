@@ -12,6 +12,20 @@ A library for adding resiliency capabilities to your RPCs (Remote Procedure Call
 * Throttling
 * Circuit Breaker
 
+### Install
+* Maven
+```xml
+<dependency>
+    <groupId>com.github.dimosr</groupId>
+    <artifactId>ServiceCall4j</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+* Gradle
+```
+compile 'com.github.dimosr:ServiceCall4j:1.0.0'
+```
+
 ### Getting Started
 
 1. Make sure the call you want to enhance implements the **ServiceCall** interface provided by Service-Call-4j:
@@ -64,6 +78,19 @@ Compile, run unit tests, package into .jar and generate unit-test, surefire repo
 ```sh
 mvn package
 ```
+
+Deploy in the local maven repo
+```
+mvn deploy
+```
+
+Update version, release in maven Central and reset version to SNAPSHOT
+```
+mvn versions:set -DnewVersion=<MAJOR>.<MINOR>.<PATCH>
+mvn clean deploy -P release
+mvn versions:set -DnewVersion=<MAJOR>.<MINOR>.<PATCH>-SNAPSHOT
+```
+
 
 ### Contributing
 
