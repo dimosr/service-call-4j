@@ -4,14 +4,13 @@ import com.dimosr.service.core.Cache;
 import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.UncheckedTimeoutException;
+import com.dimosr.service.util.GuavaCache;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -100,12 +99,23 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     /**
      * Enables caching, so that responses from the underlying service will be cached
-     * @param cache the cache that will be used to cache responses of the services
+     * @param cache the custom cache that will be used to cache responses of the services
      *
      * @return the builder used to build the service call
      */
-    public ServiceCallBuilder<REQUEST, RESPONSE> withCache(Cache<REQUEST, RESPONSE> cache) {
+    public ServiceCallBuilder<REQUEST, RESPONSE> withCache(final Cache<REQUEST, RESPONSE> cache) {
         this.cache = cache;
+        return this;
+    }
+
+    /**
+     * Enables caching, using a Guava cache so that responses from the underlying service will be cached
+     * @param cacheEntries the maximum number of entries that the cache will hold before starting evicting old entries
+     * @param ttlInMilliseconds the TTL (time-to-live), maximum duration in milliseconds that an entry can stay in the cache after its insertion
+     * @return the builder used to build the service call
+     */
+    public ServiceCallBuilder<REQUEST, RESPONSE> withCache(final int cacheEntries, final int ttlInMilliseconds) {
+        this.cache = new GuavaCache<REQUEST, RESPONSE>(cacheEntries, ttlInMilliseconds);
         return this;
     }
 

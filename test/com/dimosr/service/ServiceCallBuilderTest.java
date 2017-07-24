@@ -152,6 +152,25 @@ public class ServiceCallBuilderTest {
     }
 
     @Test
+    public void buildServiceWithThrottlingTimeoutsRetryingMonitoringAndGuavaCaching() throws NoSuchFieldException, IllegalAccessException {
+        ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
+                .withCache(10, 100)
+                .withMonitoring(metricsCollector)
+                .withTimeouts(TIMEOUT_THRESHOLD, TimeUnit.MILLISECONDS, executor)
+                .withThrottling(MAX_REQUESTS_PER_SECOND)
+                .withRetrying(false, MAX_RETRIES)
+                .build();
+
+        verifyLayersAreInCorrectOrder(enhancedServiceCall,
+                CachedServiceCall.class,
+                ProfiledServiceCall.class,
+                RetryableServiceCall.class,
+                TimingOutServiceCall.class,
+                ThrottlingServiceCall.class
+        );
+    }
+
+    @Test
     public void buildServiceWithCircuitBreakerWithoutSupplierThrottlingTimeoutsRetryingMonitoringAndCaching() throws NoSuchFieldException, IllegalAccessException {
         ServiceCall<String, String> enhancedServiceCall = new ServiceCallBuilder<>(originalServiceCall, serviceCallId)
                 .withCircuitBreaker(CIRCUIT_BREAKER_MONITORING_WINDOW, MIN_FAILING_REQUESTS, CONSECUTIVE_SUCCESSFUL_REQUESTS, OPEN_CIRCUIT_DURATION)
