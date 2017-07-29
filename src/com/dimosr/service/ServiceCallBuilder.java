@@ -115,7 +115,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
      * @return the builder used to build the service call
      */
     public ServiceCallBuilder<REQUEST, RESPONSE> withCache(final int cacheEntries, final int ttlInMilliseconds) {
-        this.cache = new GuavaCache<REQUEST, RESPONSE>(cacheEntries, ttlInMilliseconds);
+        this.cache = new GuavaCache<>(cacheEntries, ttlInMilliseconds);
         return this;
     }
 
@@ -254,7 +254,7 @@ public class ServiceCallBuilder<REQUEST, RESPONSE> {
 
     private void wrapInCache() {
         if(cache != null) {
-            enhancedServiceCall = new CachedServiceCall<>(enhancedServiceCall, cache);
+            enhancedServiceCall = new CachedServiceCall<>(enhancedServiceCall, serviceCallID, cache);
         }
     }
 

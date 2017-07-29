@@ -3,6 +3,8 @@ package com.dimosr.service;
 import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.UncheckedTimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -14,6 +16,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
+    private static final Logger log = LoggerFactory.getLogger(ThrottlingServiceCall.class);
+
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
     private final String serviceCallID;
     private final long timeout;
@@ -65,6 +69,7 @@ class TimingOutServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
         } catch (TimeoutException e) {
             emitMetric(1);
             String message = String.format("Service call timed out after %d %s", timeout, accuracy);
+            log.info("{}: call timed out after {} {}", serviceCallID, timeout, accuracy.toString());
             throw new UncheckedTimeoutException(message, e);
         } catch(ExecutionException e) {
             throw unwrapExecutionException(e);

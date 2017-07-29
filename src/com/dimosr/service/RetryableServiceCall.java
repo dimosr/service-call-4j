@@ -6,6 +6,8 @@ import com.dimosr.service.exceptions.MaximumRetriesException;
 import com.dimosr.service.exceptions.RetryableException;
 import com.dimosr.service.util.Sleeper;
 import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -16,6 +18,8 @@ import java.util.List;
  * There client can define the RetryPolicy and the backoff interval, which will be used with milliseconds precision
  */
 class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
+    private static final Logger log = LoggerFactory.getLogger(RetryableServiceCall.class);
+
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
     private final String serviceCallID;
 
@@ -95,14 +99,17 @@ class RetryableServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RE
                 return response;
             } catch(Exception exception) {
                 if(isRetryable(exception)) {
+                    log.info("{}: Request failed with exception {}", serviceCallID, exception.toString());
                     finalException = exception;
                     try {
                         Duration backoff = retryingPolicy.getRetryBackoff(retriesMade+1);
                         sleeper.sleep(backoff.toMillis());
+                        log.info("{}: Will retry the request after having waited for {} milliseconds", serviceCallID, backoff.toMillis());
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         throw new MaximumRetriesException("ServiceCall interrupted while retrying", e);
                     }
+                    log.info("{}: Total number of retries made so far: {}", serviceCallID, retriesMade);
                     retriesMade++;
                 } else {
                     emitMetrics(retriesMade);

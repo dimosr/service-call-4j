@@ -24,6 +24,7 @@ public class CachedServiceCallTest {
 
     @Mock
     private ServiceCall<String, String> mockRootServiceCall;
+    private String serviceCallId = "service-id";
     @Mock
     private Cache<String, String> mockCache;
 
@@ -32,7 +33,7 @@ public class CachedServiceCallTest {
 
     @Before
     public void setupCachedService() {
-        this.cachedServiceCall = new CachedServiceCall<>(mockRootServiceCall, mockCache);
+        this.cachedServiceCall = new CachedServiceCall<>(mockRootServiceCall, serviceCallId, mockCache);
     }
 
     @Test

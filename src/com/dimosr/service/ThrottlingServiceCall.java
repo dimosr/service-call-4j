@@ -3,6 +3,8 @@ package com.dimosr.service;
 import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.ThrottledException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.util.concurrent.atomic.AtomicLong;
@@ -10,6 +12,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
+    private static final Logger log = LoggerFactory.getLogger(ThrottlingServiceCall.class);
+
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
     private String serviceCallID;
     private final long maxRequestsPerSecond;
@@ -67,6 +71,7 @@ class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, R
                 if(differMoreThanASecond(currentSecondTimestamp, callTimestamp)) {
                     currentSecondTimestamp = truncateToSecond(callTimestamp);
                     requestsCounter.set(0);
+                    log.debug("{}: Second elapsed, resetting request counter back to zero", serviceCallID);
                 }
             } finally {
                 writeLock.unlock();
@@ -86,7 +91,9 @@ class ThrottlingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, R
     private void checkIfThresholdCrossed() {
         readLock.lock();
         try {
-            if(requestsCounter.incrementAndGet() > maxRequestsPerSecond) {
+            final long requestCounterValue = requestsCounter.incrementAndGet();
+            log.info("{}: {} number of requests done in the current second, the throttling threshold is {}", serviceCallID, requestCounterValue, maxRequestsPerSecond);
+            if(requestCounterValue > maxRequestsPerSecond) {
                 emitMetric(1);
                 throw new ThrottledException(String.format(
                         "Request was throttled, there were %s requests in the current second, while the threshold is: %s",

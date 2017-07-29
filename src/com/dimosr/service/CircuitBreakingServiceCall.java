@@ -4,12 +4,15 @@ import com.dimosr.service.core.MetricsCollector;
 import com.dimosr.service.core.ServiceCall;
 import com.dimosr.service.exceptions.OpenCircuitBreakerException;
 import com.dimosr.service.util.StatisticsQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUEST, RESPONSE> {
+    private static final Logger log = LoggerFactory.getLogger(CircuitBreakingServiceCall.class);
+
     private final ServiceCall<REQUEST, RESPONSE> serviceCall;
     private final String serviceCallID;
 
@@ -45,7 +48,14 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
                                final MetricsCollector metricsCollector) {
         this.serviceCall = serviceCall;
         this.serviceCallID = serviceCallID;
-        this.circuitBreaker = new CircuitBreaker(requestsWindow, failingRequestsToOpen, consecutiveSuccessfulRequestsToClose, durationOfOpenInMilliseconds, clock);
+        this.circuitBreaker = new CircuitBreaker(
+                serviceCallID,
+                requestsWindow,
+                failingRequestsToOpen,
+                consecutiveSuccessfulRequestsToClose,
+                durationOfOpenInMilliseconds,
+                clock
+        );
         this.metricsCollector = metricsCollector;
         this.clock = clock;
     }
@@ -73,9 +83,12 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
         emitMetrics(currentState);
         if(currentState == CircuitBreaker.CircuitBreakerState.OPEN) {
             if(responseSupplier == null) {
+                log.info("{}: circuit breaker is open, so there will be no call to the service, the request will fail", serviceCallID);
                 throw new OpenCircuitBreakerException("Circuit breaker is opened, request to underlying service was not made.");
             } else {
-                return responseSupplier.apply(request);
+                RESPONSE response = responseSupplier.apply(request);
+                log.info("{}: circuit breaker is open, so there will be no call to the service, the response provided by the supplier will be returned {}", serviceCallID, response.toString());
+                return response;
             }
         }
 
@@ -95,6 +108,8 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
     }
 
     private static class CircuitBreaker {
+        private final String serviceCallID;
+
         private final Clock clock;
         private final StatisticsQueue<RequestResult> closedRequestQueue;
         private StatisticsQueue<RequestResult> halfOpenRequestQueue;
@@ -107,11 +122,13 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
 
         private long lastOpenedTimestamp;
 
-        private CircuitBreaker(final int requestsWindow,
+        private CircuitBreaker(final String serviceCallID,
+                               final int requestsWindow,
                                final int failingRequestsToOpen,
                                final int consecutiveSuccessfulRequestsToClose,
                                final long openDurationInMilliseconds,
                                final Clock clock) {
+            this.serviceCallID = serviceCallID;
             this.state = CircuitBreakerState.CLOSED;
             this.failingRequestsToOpen = failingRequestsToOpen;
             this.consecutiveSuccessfulRequestsToClose = consecutiveSuccessfulRequestsToClose;
@@ -136,12 +153,15 @@ class CircuitBreakingServiceCall<REQUEST, RESPONSE> implements ServiceCall<REQUE
                 if (state == CircuitBreakerState.HALF_OPEN) {
                     if(allSamplingRequestsCompleted()) {
                         if (allSamplingRequestsSuccessful()) {
+                            log.info("{}: circuit breaker transitioned from HALF_OPEN to CLOSED", serviceCallID);
                             closeCircuit();
                         } else {
+                            log.info("{}: circuit breaker transitioned from HALF_OPEN to OPEN", serviceCallID);
                             openCircuit();
                         }
                     }
                 } else if (state == CircuitBreakerState.CLOSED && moreFailuresThanAcceptable()) {
+                        log.info("{}: circuit breaker transitioned from CLOSED to OPEN", serviceCallID);
                         openCircuit();
                 }
             }
