@@ -6,7 +6,7 @@
 
     <groupId>com.github.dimosr</groupId>
     <artifactId>ServiceCall4j</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>ServiceCall4j</name>
