@@ -65,4 +65,9 @@ ServiceCall<String, String> enhancedHelloWorldCall = new ServiceCallBuilder<>(ne
 String response = enhancedHelloWorldCall.call("World");
 ```
 
-Check the project's Wiki for more documentation about how each capability can be used.
+## More Info
+
+Check the project's Wiki for more documentation about how each capability can be used.  
+This Wiki also contains a FAQ section, describing what's the difference between this library and alternatives, such as Hystrix.
+
+If you want a quick demo of how you can use the library, check [this](https://github.com/dimosr/service-call4j-demo). 
